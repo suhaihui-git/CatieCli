@@ -40,16 +40,24 @@ else
 fi
 
 # 生成随机密钥
-SECRET_KEY=$(openssl rand -hex 16)
+SECRET_KEY=$(openssl rand -hex 32)
 
 # 询问管理员密码
 echo ""
 read -p "🔐 请输入管理员密码 (直接回车使用默认 admin123): " ADMIN_PASSWORD
 ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin123}
 
-# 修改 docker-compose.yml
-sed -i "s/ADMIN_PASSWORD=admin123/ADMIN_PASSWORD=$ADMIN_PASSWORD/" docker-compose.yml
-sed -i "s/SECRET_KEY=change-this-to-random-string/SECRET_KEY=$SECRET_KEY/" docker-compose.yml
+# 创建 .env 文件
+echo "📝 创建配置文件..."
+cat > .env << EOF
+# CatieCli 配置
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=$ADMIN_PASSWORD
+SECRET_KEY=$SECRET_KEY
+PORT=5001
+EOF
+
+echo "✅ 配置文件已创建"
 
 # 启动服务
 echo ""

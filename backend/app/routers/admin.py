@@ -105,9 +105,15 @@ async def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     
+    # 删除用户的凭证（设置 user_id 为 NULL 或直接删除）
+    await db.execute(
+        update(Credential).where(Credential.user_id == user_id).values(user_id=None)
+    )
+    
     await db.delete(user)
     await db.commit()
     await notify_user_update()
+    await notify_credential_update()
     return {"message": "删除成功"}
 
 
