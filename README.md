@@ -456,8 +456,20 @@ GOOGLE_CLIENT_SECRET=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
 
 ### OpenAI 兼容接口
 
+> 💡 端口默认 `5001`，可通过环境变量 `PORT` 自定义。如果使用域名反向代理，直接用域名即可。
+
 ```bash
+# 本地/IP 访问（替换为你的端口）
 curl http://localhost:5001/v1/chat/completions \
+  -H "Authorization: Bearer cat-your-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-2.5-flash",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+
+# 域名访问
+curl https://your-domain.com/v1/chat/completions \
   -H "Authorization: Bearer cat-your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
