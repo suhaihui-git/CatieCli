@@ -311,27 +311,29 @@ async def verify_all_credentials(
                 test_url = "https://cloudcode-pa.googleapis.com/v1internal:generateContent"
                 headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
                 
-                # 先测试 3.0（优先）
-                test_payload_3 = {
-                    "model": "gemini-2.5-pro",
+                # 先测试 2.5 验证凭证有效性
+                test_payload_25 = {
+                    "model": "gemini-2.5-flash",
                     "project": cred.project_id or "",
                     "request": {"contents": [{"role": "user", "parts": [{"text": "hi"}]}]}
                 }
-                resp = await client.post(test_url, headers=headers, json=test_payload_3)
+                resp = await client.post(test_url, headers=headers, json=test_payload_25)
                 if resp.status_code == 200 or resp.status_code == 429:
                     is_valid = True
-                    supports_3 = True
-                else:
-                    # 3.0 失败，再测试 2.5
-                    test_payload_25 = {
-                        "model": "gemini-2.5-flash",
+                    
+                    # 凭证有效，再测试是否支持 3.0 模型
+                    test_payload_3 = {
+                        "model": "gemini-3-pro-preview",
                         "project": cred.project_id or "",
                         "request": {"contents": [{"role": "user", "parts": [{"text": "hi"}]}]}
                     }
-                    resp = await client.post(test_url, headers=headers, json=test_payload_25)
-                    if resp.status_code == 200 or resp.status_code == 429:
-                        is_valid = True
+                    resp_3 = await client.post(test_url, headers=headers, json=test_payload_3)
+                    if resp_3.status_code == 200 or resp_3.status_code == 429:
+                        supports_3 = True
+                        print(f"[检测] {cred.email} 支持 3.0 模型", flush=True)
+                    else:
                         supports_3 = False
+                        print(f"[检测] {cred.email} 不支持 3.0 模型 (status={resp_3.status_code})", flush=True)
             
             # 检测账号类型（Pro/Free）
             if is_valid and cred.project_id:

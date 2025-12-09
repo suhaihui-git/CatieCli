@@ -1,6 +1,5 @@
 import {
     ArrowLeft,
-    BarChart3,
     Cat,
     Check,
     ExternalLink,
@@ -21,8 +20,7 @@ import { useWebSocket } from '../hooks/useWebSocket'
 
 export default function Admin() {
   const { user } = useAuth()
-  const [tab, setTab] = useState('stats')
-  const [stats, setStats] = useState(null)
+  const [tab, setTab] = useState('users')
   const [users, setUsers] = useState([])
   const [credentials, setCredentials] = useState([])
   const [logs, setLogs] = useState([])
@@ -37,10 +35,7 @@ export default function Admin() {
   // WebSocket 实时更新
   const handleWsMessage = useCallback((data) => {
     console.log('WS:', data.type)
-    if (data.type === 'stats_update') {
-      // 实时更新统计
-      api.get('/api/admin/stats').then(res => setStats(res.data)).catch(() => {})
-    } else if (data.type === 'user_update') {
+    if (data.type === 'user_update') {
       // 实时更新用户列表
       api.get('/api/admin/users').then(res => setUsers(res.data.users)).catch(() => {})
     } else if (data.type === 'credential_update') {
@@ -57,10 +52,7 @@ export default function Admin() {
   const fetchData = async () => {
     setLoading(true)
     try {
-      if (tab === 'stats') {
-        const res = await api.get('/api/admin/stats')
-        setStats(res.data)
-      } else if (tab === 'users') {
+      if (tab === 'users') {
         const res = await api.get('/api/admin/users')
         setUsers(res.data.users)
       } else if (tab === 'credentials') {
@@ -161,7 +153,6 @@ export default function Admin() {
   }
 
   const tabs = [
-    { id: 'stats', label: '统计概览', icon: BarChart3 },
     { id: 'users', label: '用户管理', icon: Users },
     { id: 'credentials', label: '凭证池', icon: Key },
     { id: 'logs', label: '使用日志', icon: ScrollText },
@@ -286,53 +277,6 @@ export default function Admin() {
           <div className="text-center py-12 text-gray-400">加载中...</div>
         ) : (
           <>
-            {/* 统计概览 */}
-            {tab === 'stats' && stats && (
-              <div className="space-y-6">
-                <div className="grid md:grid-cols-4 gap-4">
-                  <div className="card">
-                    <div className="text-gray-400 text-sm">用户总数</div>
-                    <div className="text-3xl font-bold text-purple-400">{stats.user_count}</div>
-                  </div>
-                  <div className="card">
-                    <div className="text-gray-400 text-sm">活跃凭证</div>
-                    <div className="text-3xl font-bold text-green-400">
-                      {stats.active_credential_count}/{stats.credential_count}
-                    </div>
-                  </div>
-                  <div className="card">
-                    <div className="text-gray-400 text-sm">今日请求</div>
-                    <div className="text-3xl font-bold text-blue-400">{stats.today_requests}</div>
-                  </div>
-                  <div className="card">
-                    <div className="text-gray-400 text-sm">总请求数</div>
-                    <div className="text-3xl font-bold text-gray-300">{stats.total_requests}</div>
-                  </div>
-                </div>
-
-                {/* 趋势图 */}
-                <div className="card">
-                  <h3 className="text-lg font-semibold mb-4">近7日请求趋势</h3>
-                  <div className="flex items-end gap-2 h-40">
-                    {stats.daily_stats.map((day, i) => {
-                      const max = Math.max(...stats.daily_stats.map(d => d.count), 1)
-                      const height = (day.count / max) * 100
-                      return (
-                        <div key={i} className="flex-1 flex flex-col items-center gap-1">
-                          <span className="text-xs text-gray-400">{day.count}</span>
-                          <div
-                            className="w-full bg-purple-600 rounded-t"
-                            style={{ height: `${Math.max(height, 4)}%` }}
-                          />
-                          <span className="text-xs text-gray-500">{day.date.slice(5)}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* 用户管理 */}
             {tab === 'users' && (
               <div className="space-y-4">
