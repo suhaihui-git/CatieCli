@@ -322,13 +322,13 @@ export default function Credentials() {
                           </span>
                         )}
                         
-                        {/* 模型等级 - 蓝色边框空心 */}
+                        {/* 模型等级 */}
                         {cred.model_tier === "3" ? (
-                          <span className="text-xs px-2.5 py-1 border border-blue-500 text-blue-400 rounded font-medium">
-                            3.0可用
+                          <span className="text-xs px-2.5 py-1 bg-yellow-500/20 text-yellow-400 rounded font-medium">
+                            ⭐ 3.0可用
                           </span>
                         ) : (
-                          <span className="text-xs px-2.5 py-1 border border-gray-500 text-gray-400 rounded font-medium">
+                          <span className="text-xs px-2.5 py-1 bg-gray-600/50 text-gray-400 rounded font-medium">
                             2.5
                           </span>
                         )}
