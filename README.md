@@ -384,6 +384,15 @@ docker-compose up -d --build
 - **前端已构建**，无需手动 npm build
 - **默认账号**：`admin` / `admin123`（请立即修改！）
 - **默认端口**：`5001`，可通过环境变量 `PORT` 自定义
+- **Google OAuth**：已内置 Gemini CLI 官方凭据，无需配置即可使用
+
+### 关于 Google OAuth 凭据
+
+项目已内置 Gemini CLI 官方公开凭据，**无需额外配置**即可获取 Gemini 凭证。
+
+⚠️ **注意**：如果你自己配置了 `GOOGLE_CLIENT_ID` 和 `GOOGLE_CLIENT_SECRET`，需要在 [Google Cloud Console](https://console.cloud.google.com/apis/credentials) 添加回调地址 `http://localhost:8080`，否则会报 `redirect_uri_mismatch` 错误。
+
+**建议**：直接使用默认凭据，不要自己配置。
 
 ### 自定义端口示例
 
