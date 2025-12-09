@@ -490,30 +490,24 @@ async def get_stats_by_user(
 @router.get("/stats/daily")
 async def get_daily_stats(
     days: int = 30,
-    status: str = "all",  # all, success, failed
     user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
     """获取每日统计数据（用于图表）"""
     since = datetime.utcnow() - timedelta(days=days)
     
-    query = select(
-        func.date(UsageLog.created_at).label("date"),
-        func.count(UsageLog.id).label("count")
-    ).where(UsageLog.created_at >= since)
-    
-    # 根据状态过滤
-    if status == "success":
-        query = query.where(UsageLog.status_code == 200)
-    elif status == "failed":
-        query = query.where(UsageLog.status_code != 200)
-    
-    query = query.group_by(func.date(UsageLog.created_at)).order_by(func.date(UsageLog.created_at))
-    result = await db.execute(query)
+    result = await db.execute(
+        select(
+            func.date(UsageLog.created_at).label("date"),
+            func.count(UsageLog.id).label("count")
+        )
+        .where(UsageLog.created_at >= since)
+        .group_by(func.date(UsageLog.created_at))
+        .order_by(func.date(UsageLog.created_at))
+    )
     
     return {
         "period_days": days,
-        "status_filter": status,
         "daily": [{"date": str(row[0]), "count": row[1]} for row in result.all()]
     }
 
@@ -531,6 +525,7 @@ async def get_config(user: User = Depends(get_current_admin)):
         "credential_reward_quota": settings.credential_reward_quota,
         "base_rpm": settings.base_rpm,
         "contributor_rpm": settings.contributor_rpm,
+        "error_retry_count": settings.error_retry_count,
         "admin_username": settings.admin_username,
         "credential_pool_mode": settings.credential_pool_mode,
         "announcement_enabled": settings.announcement_enabled,
@@ -562,6 +557,7 @@ async def update_config(
     credential_reward_quota: Optional[int] = Form(None),
     base_rpm: Optional[int] = Form(None),
     contributor_rpm: Optional[int] = Form(None),
+    error_retry_count: Optional[int] = Form(None),
     credential_pool_mode: Optional[str] = Form(None),
     announcement_enabled: Optional[bool] = Form(None),
     announcement_title: Optional[str] = Form(None),
@@ -604,6 +600,10 @@ async def update_config(
             updated["credential_pool_mode"] = credential_pool_mode
         else:
             raise HTTPException(status_code=400, detail="无效的凭证池模式")
+    if error_retry_count is not None:
+        settings.error_retry_count = error_retry_count
+        await save_config_to_db("error_retry_count", error_retry_count)
+        updated["error_retry_count"] = error_retry_count
     
     # 公告配置
     if announcement_enabled is not None:

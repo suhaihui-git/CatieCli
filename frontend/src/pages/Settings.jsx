@@ -1,22 +1,7 @@
-import { ArrowLeft, RotateCcw, Save, Settings as SettingsIcon } from 'lucide-react'
+import { ArrowLeft, Save, Settings as SettingsIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../api'
-
-// 默认配置值
-const DEFAULT_CONFIG = {
-  allow_registration: true,
-  discord_only_registration: false,
-  default_daily_quota: 100,
-  credential_reward_quota: 1000,
-  base_rpm: 5,
-  contributor_rpm: 10,
-  credential_pool_mode: 'full_shared',
-  announcement_enabled: false,
-  announcement_title: '',
-  announcement_content: '',
-  announcement_read_seconds: 5
-}
 
 export default function Settings() {
   const navigate = useNavigate()
@@ -53,6 +38,7 @@ export default function Settings() {
       formData.append('credential_reward_quota', config.credential_reward_quota)
       formData.append('base_rpm', config.base_rpm)
       formData.append('contributor_rpm', config.contributor_rpm)
+      formData.append('error_retry_count', config.error_retry_count)
       formData.append('credential_pool_mode', config.credential_pool_mode)
       formData.append('announcement_enabled', config.announcement_enabled)
       formData.append('announcement_title', config.announcement_title || '')
@@ -65,13 +51,6 @@ export default function Settings() {
       setMessage({ type: 'error', text: '保存失败: ' + (err.response?.data?.detail || err.message) })
     } finally {
       setSaving(false)
-    }
-  }
-
-  const handleReset = () => {
-    if (confirm('确定要重置所有设置为默认值吗？')) {
-      setConfig({ ...DEFAULT_CONFIG })
-      setMessage({ type: 'success', text: '已重置为默认值，请点击保存生效' })
     }
   }
 
@@ -147,9 +126,8 @@ export default function Settings() {
             <p className="text-gray-400 text-sm mb-3">新注册用户的每日请求限制</p>
             <input
               type="number"
-              min="0"
-              value={config?.default_daily_quota ?? ''}
-              onChange={(e) => setConfig({ ...config, default_daily_quota: e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value) || 0) })}
+              value={config?.default_daily_quota || 100}
+              onChange={(e) => setConfig({ ...config, default_daily_quota: parseInt(e.target.value) || 0 })}
               className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
@@ -160,9 +138,8 @@ export default function Settings() {
             <p className="text-gray-400 text-sm mb-3">用户每捐赠一个凭证到公共池时增加的配额</p>
             <input
               type="number"
-              min="0"
-              value={config?.credential_reward_quota ?? ''}
-              onChange={(e) => setConfig({ ...config, credential_reward_quota: e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value) || 0) })}
+              value={config?.credential_reward_quota || 1000}
+              onChange={(e) => setConfig({ ...config, credential_reward_quota: parseInt(e.target.value) || 0 })}
               className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <p className="text-green-400 text-sm mt-2">
@@ -203,9 +180,8 @@ export default function Settings() {
               <p className="text-gray-400 text-sm mb-3">未贡献凭证用户的每分钟请求数</p>
               <input
                 type="number"
-                min="1"
-                value={config?.base_rpm ?? ''}
-                onChange={(e) => setConfig({ ...config, base_rpm: e.target.value === '' ? 1 : Math.max(1, parseInt(e.target.value) || 1) })}
+                value={config?.base_rpm || 5}
+                onChange={(e) => setConfig({ ...config, base_rpm: parseInt(e.target.value) || 5 })}
                 className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
               <p className="text-gray-500 text-sm mt-1">次/分钟</p>
@@ -215,13 +191,30 @@ export default function Settings() {
               <p className="text-gray-400 text-sm mb-3">贡献凭证用户的每分钟请求数</p>
               <input
                 type="number"
-                min="1"
-                value={config?.contributor_rpm ?? ''}
-                onChange={(e) => setConfig({ ...config, contributor_rpm: e.target.value === '' ? 1 : Math.max(1, parseInt(e.target.value) || 1) })}
+                value={config?.contributor_rpm || 10}
+                onChange={(e) => setConfig({ ...config, contributor_rpm: parseInt(e.target.value) || 10 })}
                 className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
               <p className="text-gray-500 text-sm mt-1">次/分钟</p>
             </div>
+          </div>
+
+          {/* 错误重试 */}
+          <div>
+            <h3 className="font-semibold mb-2">报错切换凭证重试次数 🔄</h3>
+            <p className="text-gray-400 text-sm mb-3">遇到 API 错误（如 404、500 等）时自动切换凭证重试的次数</p>
+            <input
+              type="number"
+              min="0"
+              max="10"
+              value={config?.error_retry_count || 3}
+              onChange={(e) => setConfig({ ...config, error_retry_count: parseInt(e.target.value) || 0 })}
+              className="w-32 bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <p className="text-gray-500 text-sm mt-1">设为 0 则不重试，直接返回错误</p>
+            <p className="text-blue-400 text-sm mt-2">
+              💡 当凭证请求失败时，系统会自动尝试切换到其他可用凭证重试
+            </p>
           </div>
 
           {/* 公告配置 */}
@@ -270,8 +263,8 @@ export default function Settings() {
                     type="number"
                     min="0"
                     max="60"
-                    value={config?.announcement_read_seconds ?? ''}
-                    onChange={(e) => setConfig({ ...config, announcement_read_seconds: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                    value={config?.announcement_read_seconds || 5}
+                    onChange={(e) => setConfig({ ...config, announcement_read_seconds: parseInt(e.target.value) || 5 })}
                     className="w-32 bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500"
                   />
                   <p className="text-gray-500 text-sm mt-1">用户首次阅读需等待此时间才能关闭公告</p>
@@ -280,19 +273,12 @@ export default function Settings() {
             )}
           </div>
 
-          {/* 保存和重置按钮 */}
-          <div className="pt-4 border-t border-gray-700 flex gap-4">
-            <button
-              onClick={handleReset}
-              className="flex-1 py-3 bg-gray-600 hover:bg-gray-500 rounded-lg font-semibold flex items-center justify-center gap-2"
-            >
-              <RotateCcw size={18} />
-              重置为默认值
-            </button>
+          {/* 保存按钮 */}
+          <div className="pt-4 border-t border-gray-700">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex-1 py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full py-3 bg-purple-600 hover:bg-purple-700 rounded-lg font-semibold flex items-center justify-center gap-2 disabled:opacity-50"
             >
               <Save size={18} />
               {saving ? '保存中...' : '保存配置'}

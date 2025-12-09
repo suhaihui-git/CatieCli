@@ -54,12 +54,6 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
     if settings.discord_only_registration:
         raise HTTPException(status_code=403, detail="请通过 Discord Bot 注册")
     
-    # 验证用户名和密码
-    if len(data.username) < 2 or len(data.username) > 50:
-        raise HTTPException(status_code=400, detail="用户名长度需在2-50字符之间")
-    if len(data.password) < 6:
-        raise HTTPException(status_code=400, detail="密码长度至少6位")
-    
     # 检查用户名是否存在
     result = await db.execute(select(User).where(User.username == data.username))
     if result.scalar_one_or_none():
@@ -123,40 +117,14 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
 @router.get("/me")
 async def get_me(user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """获取当前用户信息"""
+    # 获取今日使用量
     today = date.today()
-    
-    # 获取今日总使用量
     result = await db.execute(
         select(func.count(UsageLog.id))
         .where(UsageLog.user_id == user.id)
         .where(func.date(UsageLog.created_at) == today)
     )
     today_usage = result.scalar() or 0
-    
-    # 获取分类使用量
-    flash_result = await db.execute(
-        select(func.count(UsageLog.id))
-        .where(UsageLog.user_id == user.id)
-        .where(func.date(UsageLog.created_at) == today)
-        .where(UsageLog.model.ilike("%flash%"))
-    )
-    flash_usage = flash_result.scalar() or 0
-    
-    pro25_result = await db.execute(
-        select(func.count(UsageLog.id))
-        .where(UsageLog.user_id == user.id)
-        .where(func.date(UsageLog.created_at) == today)
-        .where(UsageLog.model.ilike("%2.5%pro%"))
-    )
-    pro25_usage = pro25_result.scalar() or 0
-    
-    pro30_result = await db.execute(
-        select(func.count(UsageLog.id))
-        .where(UsageLog.user_id == user.id)
-        .where(func.date(UsageLog.created_at) == today)
-        .where(UsageLog.model.ilike("%3%pro%") | UsageLog.model.ilike("%thinking%") | UsageLog.model.ilike("%exp%"))
-    )
-    pro30_usage = pro30_result.scalar() or 0
     
     # 获取用户凭证数量
     cred_result = await db.execute(
@@ -183,13 +151,6 @@ async def get_me(user: User = Depends(get_current_user), db: AsyncSession = Depe
         "is_active": user.is_active,
         "daily_quota": user.daily_quota,
         "today_usage": today_usage,
-        # 分类配额
-        "flash_quota": user.flash_quota or 0,
-        "pro25_quota": user.pro25_quota or 0,
-        "pro30_quota": user.pro30_quota or 0,
-        "flash_usage": flash_usage,
-        "pro25_usage": pro25_usage,
-        "pro30_usage": pro30_usage,
         "credential_count": credential_count,
         "public_credential_count": public_credential_count,
         "has_public_credentials": public_credential_count > 0,
@@ -725,10 +686,6 @@ async def register_from_discord(data: DiscordRegister, db: AsyncSession = Depend
     # 验证用户名格式
     if not data.username.isalnum() or len(data.username) < 3 or len(data.username) > 20:
         raise HTTPException(status_code=400, detail="用户名必须是3-20位字母数字")
-    
-    # 验证密码长度
-    if len(data.password) < 6:
-        raise HTTPException(status_code=400, detail="密码长度至少6位")
     
     # 创建用户
     user = User(

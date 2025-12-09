@@ -18,65 +18,6 @@ from app.config import settings
 router = APIRouter(tags=["API代理"])
 
 
-def get_model_category(model: str) -> str:
-    """判断模型类型: flash, pro25, pro30"""
-    model_lower = model.lower() if model else ""
-    if "2.5-pro" in model_lower or "2.5pro" in model_lower:
-        return "pro25"
-    elif "3-pro" in model_lower or "3.0" in model_lower or "thinking" in model_lower or "exp" in model_lower:
-        return "pro30"
-    else:
-        return "flash"
-
-
-async def check_user_quota(db: AsyncSession, user: User, model: str = None):
-    """检查用户配额，返回 (通过, 错误信息)"""
-    today = date.today()
-    
-    # 总配额检查
-    total_result = await db.execute(
-        select(func.count(UsageLog.id))
-        .where(UsageLog.user_id == user.id)
-        .where(func.date(UsageLog.created_at) == today)
-    )
-    total_usage = total_result.scalar() or 0
-    
-    if total_usage >= user.daily_quota:
-        return False, "已达到今日总配额限制"
-    
-    # 分类配额检查（如果设置了且 > 0）
-    if model:
-        category = get_model_category(model)
-        quota_limit = 0
-        model_filter = None
-        
-        if category == "flash" and user.flash_quota and user.flash_quota > 0:
-            quota_limit = user.flash_quota
-            model_filter = UsageLog.model.ilike("%flash%")
-        elif category == "pro25" and user.pro25_quota and user.pro25_quota > 0:
-            quota_limit = user.pro25_quota
-            model_filter = UsageLog.model.ilike("%2.5%pro%")
-        elif category == "pro30" and user.pro30_quota and user.pro30_quota > 0:
-            quota_limit = user.pro30_quota
-            # 3.0 模型包括 thinking, exp, 3-pro 等
-            model_filter = (UsageLog.model.ilike("%3%pro%") | UsageLog.model.ilike("%thinking%") | UsageLog.model.ilike("%exp%"))
-        
-        if quota_limit > 0 and model_filter is not None:
-            category_result = await db.execute(
-                select(func.count(UsageLog.id))
-                .where(UsageLog.user_id == user.id)
-                .where(func.date(UsageLog.created_at) == today)
-                .where(model_filter)
-            )
-            category_usage = category_result.scalar() or 0
-            
-            if category_usage >= quota_limit:
-                category_name = {"flash": "Flash", "pro25": "2.5 Pro", "pro30": "3.0 Pro"}.get(category, category)
-                return False, f"已达到今日 {category_name} 配额限制 ({category_usage}/{quota_limit})"
-    
-    return True, None
-
-
 async def get_user_from_api_key(request: Request, db: AsyncSession = Depends(get_db)) -> User:
     """从请求中提取API Key并验证用户"""
     api_key = None
@@ -104,10 +45,17 @@ async def get_user_from_api_key(request: Request, db: AsyncSession = Depends(get
     if not user.is_active:
         raise HTTPException(status_code=403, detail="账户已被禁用")
     
-    # 基础配额检查（不含模型类型）
-    passed, error = await check_user_quota(db, user)
-    if not passed:
-        raise HTTPException(status_code=429, detail=error)
+    # 检查配额
+    today = date.today()
+    result = await db.execute(
+        select(func.count(UsageLog.id))
+        .where(UsageLog.user_id == user.id)
+        .where(func.date(UsageLog.created_at) == today)
+    )
+    today_usage = result.scalar() or 0
+    
+    if today_usage >= user.daily_quota:
+        raise HTTPException(status_code=429, detail="已达到今日配额限制")
     
     return user
 
@@ -217,119 +165,177 @@ async def chat_completions(
             detail=f"速率限制: {max_rpm} 次/分钟。{'上传凭证可提升至 ' + str(settings.contributor_rpm) + ' 次/分钟' if not user_has_public else ''}"
         )
     
-    # 获取凭证（大锅饭规则 + 模型等级匹配）
-    credential = await CredentialPool.get_available_credential(
-        db, 
-        user_id=user.id,
-        user_has_public_creds=user_has_public,
-        model=model  # 传入模型用于等级匹配
-    )
-    if not credential:
-        required_tier = CredentialPool.get_required_tier(model)
-        if required_tier == "3":
-            raise HTTPException(
-                status_code=503, 
-                detail="没有可用的 Gemini 3 等级凭证。该模型需要有 Gemini 3 资格的凭证。"
-            )
-        if not user_has_public:
-            raise HTTPException(
-                status_code=503, 
-                detail="您没有可用凭证。请在凭证管理页面上传凭证，或捐赠凭证以使用公共池。"
-            )
-        raise HTTPException(status_code=503, detail="暂无可用凭证，请稍后重试")
+    # 重试逻辑：报错时切换凭证重试
+    max_retries = settings.error_retry_count
+    last_error = None
+    tried_credential_ids = set()
     
-    # 获取 access_token（自动刷新）
-    access_token = await CredentialPool.get_access_token(credential, db)
-    if not access_token:
-        await CredentialPool.mark_credential_error(db, credential.id, "Token 刷新失败")
-        raise HTTPException(status_code=503, detail="凭证已失效，请重新授权")
-    
-    # 获取 project_id
-    project_id = credential.project_id or ""
-    print(f"[Proxy] 使用凭证: {credential.email}, project_id: {project_id}, model: {model}", flush=True)
-    
-    if not project_id:
-        print(f"[Proxy] ⚠️ 凭证 {credential.email} 没有 project_id!", flush=True)
-    
-    client = GeminiClient(access_token, project_id)
-    
-    # 记录使用日志
-    async def log_usage(status_code: int = 200):
-        latency = (time.time() - start_time) * 1000
-        log = UsageLog(
+    for retry_attempt in range(max_retries + 1):
+        # 获取凭证（大锅饭规则 + 模型等级匹配）
+        credential = await CredentialPool.get_available_credential(
+            db, 
             user_id=user.id,
-            credential_id=credential.id,
+            user_has_public_creds=user_has_public,
             model=model,
-            endpoint="/v1/chat/completions",
-            status_code=status_code,
-            latency_ms=latency
+            exclude_ids=tried_credential_ids  # 排除已尝试过的凭证
         )
-        db.add(log)
-        await db.commit()
+        if not credential:
+            if retry_attempt > 0:
+                # 已经重试过，所有凭证都失败了
+                raise HTTPException(status_code=503, detail=f"所有凭证都失败了（已重试 {retry_attempt} 次）: {last_error}")
+            required_tier = CredentialPool.get_required_tier(model)
+            if required_tier == "3":
+                raise HTTPException(
+                    status_code=503, 
+                    detail="没有可用的 Gemini 3 等级凭证。该模型需要有 Gemini 3 资格的凭证。"
+                )
+            if not user_has_public:
+                raise HTTPException(
+                    status_code=503, 
+                    detail="您没有可用凭证。请在凭证管理页面上传凭证，或捐赠凭证以使用公共池。"
+                )
+            raise HTTPException(status_code=503, detail="暂无可用凭证，请稍后重试")
         
-        # 更新凭证使用次数
-        credential.total_requests = (credential.total_requests or 0) + 1
-        credential.last_used_at = datetime.utcnow()
-        await db.commit()
+        tried_credential_ids.add(credential.id)
         
-        # WebSocket 实时通知
-        await notify_log_update({
-            "username": user.username,
-            "model": model,
-            "status_code": status_code,
-            "latency_ms": round(latency, 0),
-            "created_at": datetime.utcnow().isoformat()
-        })
-        await notify_stats_update()
-    
-    # 检查是否使用假流式
-    use_fake_streaming = client.is_fake_streaming(model)
-    
-    try:
-        if stream:
-            async def stream_generator():
-                try:
-                    if use_fake_streaming:
-                        # 假流式：先发心跳，完成后一次性输出
-                        async for chunk in client.chat_completions_fake_stream(
-                            model=model,
-                            messages=messages,
-                            **{k: v for k, v in body.items() if k not in ["model", "messages", "stream"]}
-                        ):
-                            yield chunk
-                    else:
-                        # 真流式
-                        async for chunk in client.chat_completions_stream(
-                            model=model,
-                            messages=messages,
-                            **{k: v for k, v in body.items() if k not in ["model", "messages", "stream"]}
-                        ):
-                            yield chunk
-                        yield "data: [DONE]\n\n"
-                    await log_usage()
-                except Exception as e:
-                    await CredentialPool.handle_credential_failure(db, credential.id, str(e))
-                    await log_usage(500)
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            
-            return StreamingResponse(
-                stream_generator(),
-                media_type="text/event-stream",
-                headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
-            )
-        else:
-            result = await client.chat_completions(
+        # 获取 access_token（自动刷新）
+        access_token = await CredentialPool.get_access_token(credential, db)
+        if not access_token:
+            await CredentialPool.mark_credential_error(db, credential.id, "Token 刷新失败")
+            last_error = "Token 刷新失败"
+            print(f"[Proxy] ⚠️ 凭证 {credential.email} Token 刷新失败，尝试下一个凭证 ({retry_attempt + 1}/{max_retries + 1})", flush=True)
+            continue
+        
+        # 获取 project_id
+        project_id = credential.project_id or ""
+        print(f"[Proxy] 使用凭证: {credential.email}, project_id: {project_id}, model: {model} (尝试 {retry_attempt + 1}/{max_retries + 1})", flush=True)
+        
+        if not project_id:
+            print(f"[Proxy] ⚠️ 凭证 {credential.email} 没有 project_id!", flush=True)
+        
+        client = GeminiClient(access_token, project_id)
+        
+        # 记录使用日志
+        async def log_usage(status_code: int = 200, cred=credential):
+            latency = (time.time() - start_time) * 1000
+            log = UsageLog(
+                user_id=user.id,
+                credential_id=cred.id,
                 model=model,
-                messages=messages,
-                **{k: v for k, v in body.items() if k not in ["model", "messages", "stream"]}
+                endpoint="/v1/chat/completions",
+                status_code=status_code,
+                latency_ms=latency
             )
-            await log_usage()
-            return JSONResponse(content=result)
+            db.add(log)
+            await db.commit()
+            
+            # 更新凭证使用次数
+            cred.total_requests = (cred.total_requests or 0) + 1
+            cred.last_used_at = datetime.utcnow()
+            await db.commit()
+            
+            # WebSocket 实时通知
+            await notify_log_update({
+                "username": user.username,
+                "model": model,
+                "status_code": status_code,
+                "latency_ms": round(latency, 0),
+                "created_at": datetime.utcnow().isoformat()
+            })
+            await notify_stats_update()
+        
+        # 检查是否使用假流式
+        use_fake_streaming = client.is_fake_streaming(model)
+        
+        try:
+            if stream:
+                # 流式模式：使用带重试的流生成器
+                async def stream_generator_with_retry():
+                    nonlocal credential, access_token, project_id, client, tried_credential_ids, last_error
+                    
+                    for stream_retry in range(max_retries + 1):
+                        try:
+                            if use_fake_streaming:
+                                async for chunk in client.chat_completions_fake_stream(
+                                    model=model,
+                                    messages=messages,
+                                    **{k: v for k, v in body.items() if k not in ["model", "messages", "stream"]}
+                                ):
+                                    yield chunk
+                            else:
+                                async for chunk in client.chat_completions_stream(
+                                    model=model,
+                                    messages=messages,
+                                    **{k: v for k, v in body.items() if k not in ["model", "messages", "stream"]}
+                                ):
+                                    yield chunk
+                                yield "data: [DONE]\n\n"
+                            await log_usage(cred=credential)
+                            return  # 成功，退出
+                        except Exception as e:
+                            error_str = str(e)
+                            await CredentialPool.handle_credential_failure(db, credential.id, error_str)
+                            last_error = error_str
+                            
+                            # 检查是否应该重试（404、500、503 等错误）
+                            should_retry = any(code in error_str for code in ["404", "500", "503", "429", "RESOURCE_EXHAUSTED", "NOT_FOUND"])
+                            
+                            if should_retry and stream_retry < max_retries:
+                                print(f"[Proxy] ⚠️ 流式请求失败: {error_str}，切换凭证重试 ({stream_retry + 2}/{max_retries + 1})", flush=True)
+                                
+                                # 获取新凭证
+                                new_credential = await CredentialPool.get_available_credential(
+                                    db, user_id=user.id, user_has_public_creds=user_has_public,
+                                    model=model, exclude_ids=tried_credential_ids
+                                )
+                                if new_credential:
+                                    tried_credential_ids.add(new_credential.id)
+                                    new_token = await CredentialPool.get_access_token(new_credential, db)
+                                    if new_token:
+                                        credential = new_credential
+                                        access_token = new_token
+                                        project_id = new_credential.project_id or ""
+                                        client = GeminiClient(access_token, project_id)
+                                        print(f"[Proxy] 🔄 切换到凭证: {credential.email}", flush=True)
+                                        continue
+                            
+                            # 无法重试，输出错误
+                            await log_usage(500, cred=credential)
+                            yield f"data: {json.dumps({'error': f'API Error (已重试 {stream_retry + 1} 次): {error_str}'})}\n\n"
+                            return
+                
+                return StreamingResponse(
+                    stream_generator_with_retry(),
+                    media_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "Connection": "keep-alive"}
+                )
+            else:
+                # 非流式模式
+                result = await client.chat_completions(
+                    model=model,
+                    messages=messages,
+                    **{k: v for k, v in body.items() if k not in ["model", "messages", "stream"]}
+                )
+                await log_usage()
+                return JSONResponse(content=result)
+        
+        except Exception as e:
+            error_str = str(e)
+            await CredentialPool.handle_credential_failure(db, credential.id, error_str)
+            last_error = error_str
+            
+            # 检查是否应该重试
+            should_retry = any(code in error_str for code in ["404", "500", "503", "429", "RESOURCE_EXHAUSTED", "NOT_FOUND"])
+            
+            if should_retry and retry_attempt < max_retries:
+                print(f"[Proxy] ⚠️ 请求失败: {error_str}，切换凭证重试 ({retry_attempt + 2}/{max_retries + 1})", flush=True)
+                continue
+            
+            await log_usage(500)
+            raise HTTPException(status_code=500, detail=f"API调用失败 (已重试 {retry_attempt + 1} 次): {error_str}")
     
-    except Exception as e:
-        await CredentialPool.handle_credential_failure(db, credential.id, str(e))
-        await log_usage(500)
-        raise HTTPException(status_code=500, detail=f"API调用失败: {str(e)}")
+    # 所有重试都失败
+    raise HTTPException(status_code=503, detail=f"所有凭证都失败了: {last_error}")
 
 
 # ===== Gemini 原生接口支持 =====

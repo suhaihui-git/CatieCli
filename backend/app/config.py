@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     
     # 服务
     host: str = "0.0.0.0"
-    port: int = 5001
+    port: int = 8000
     
     # Gemini
     gemini_api_base: str = "https://generativelanguage.googleapis.com"
@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # 速率限制 (RPM - requests per minute)
     base_rpm: int = 5  # 未上传凭证的用户
     contributor_rpm: int = 10  # 上传凭证的用户
+    
+    # 错误重试
+    error_retry_count: int = 3  # 报错时切换凭证重试次数
     
     # 注册
     allow_registration: bool = True
@@ -77,6 +80,7 @@ PERSISTENT_CONFIG_KEYS = [
     "base_rpm",
     "contributor_rpm",
     "credential_pool_mode",
+    "error_retry_count",
     "announcement_enabled",
     "announcement_title",
     "announcement_content",

@@ -369,39 +369,6 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* 分类配额显示（如果有设置） */}
-            {(userInfo?.flash_quota > 0 || userInfo?.pro25_quota > 0 || userInfo?.pro30_quota > 0) && (
-              <div className="grid grid-cols-3 gap-4 mb-6">
-                {userInfo?.flash_quota > 0 && (
-                  <div className="bg-cyan-600/20 border border-cyan-600/30 rounded-xl p-4 text-center">
-                    <div className="text-2xl font-bold mb-1">
-                      <span className="text-cyan-400">{userInfo?.flash_usage || 0}</span>
-                      <span className="text-gray-500"> / {userInfo?.flash_quota}</span>
-                    </div>
-                    <div className="text-cyan-300 text-sm">Flash 配额</div>
-                  </div>
-                )}
-                {userInfo?.pro25_quota > 0 && (
-                  <div className="bg-orange-600/20 border border-orange-600/30 rounded-xl p-4 text-center">
-                    <div className="text-2xl font-bold mb-1">
-                      <span className="text-orange-400">{userInfo?.pro25_usage || 0}</span>
-                      <span className="text-gray-500"> / {userInfo?.pro25_quota}</span>
-                    </div>
-                    <div className="text-orange-300 text-sm">2.5 Pro 配额</div>
-                  </div>
-                )}
-                {userInfo?.pro30_quota > 0 && (
-                  <div className="bg-pink-600/20 border border-pink-600/30 rounded-xl p-4 text-center">
-                    <div className="text-2xl font-bold mb-1">
-                      <span className="text-pink-400">{userInfo?.pro30_usage || 0}</span>
-                      <span className="text-gray-500"> / {userInfo?.pro30_quota}</span>
-                    </div>
-                    <div className="text-pink-300 text-sm">3.0 Pro 配额</div>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* 贡献提示 */}
             <div className="bg-gradient-to-r from-purple-600/20 via-pink-600/20 to-purple-600/20 border border-purple-500/30 rounded-xl p-6 mb-6">
               <div className="flex items-center gap-4">

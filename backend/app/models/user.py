@@ -17,10 +17,7 @@ class User(Base):
     discord_name = Column(String(100), nullable=True)  # Discord 用户名
     is_active = Column(Boolean, default=True)
     is_admin = Column(Boolean, default=False)
-    daily_quota = Column(Integer, default=100)  # 每日总请求配额
-    flash_quota = Column(Integer, default=0)  # Flash 模型配额 (0=无限制，使用总配额)
-    pro25_quota = Column(Integer, default=0)  # 2.5 Pro 模型配额 (0=无限制)
-    pro30_quota = Column(Integer, default=0)  # 3.0 Pro 模型配额 (0=无限制)
+    daily_quota = Column(Integer, default=100)  # 每日请求配额
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # 关系
@@ -55,16 +52,16 @@ class UsageLog(Base):
     __tablename__ = "usage_logs"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     api_key_id = Column(Integer, ForeignKey("api_keys.id"), nullable=True)
-    credential_id = Column(Integer, ForeignKey("credentials.id"), nullable=True, index=True)
+    credential_id = Column(Integer, ForeignKey("credentials.id"), nullable=True)  # 使用的凭证
     model = Column(String(100), nullable=True)
     endpoint = Column(String(200), nullable=True)
     tokens_input = Column(Integer, default=0)
     tokens_output = Column(Integer, default=0)
     status_code = Column(Integer, nullable=True)
     latency_ms = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
     
     # 关系
     user = relationship("User", back_populates="usage_logs")

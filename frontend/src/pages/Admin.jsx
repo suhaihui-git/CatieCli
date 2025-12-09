@@ -69,10 +69,6 @@ export default function Admin() {
       } else if (tab === 'logs') {
         const res = await api.get('/api/admin/logs?limit=100')
         setLogs(res.data.logs)
-      } else if (tab === 'settings') {
-        // 获取当前配置
-        const res = await api.get('/api/manage/config')
-        setDefaultQuota(res.data.default_daily_quota ?? 100)
       }
     } catch (err) {
       console.error('获取数据失败', err)
@@ -452,9 +448,9 @@ export default function Admin() {
                       <tr>
                         <th>ID</th>
                         <th>名称</th>
-                        <th>所有者</th>
                         <th>API Key</th>
                         <th>请求数</th>
+                        <th>失败数</th>
                         <th>状态</th>
                         <th>最后错误</th>
                         <th>操作</th>
@@ -464,19 +460,12 @@ export default function Admin() {
                       {credentials.map(c => (
                         <tr key={c.id}>
                           <td className="text-gray-400">{c.id}</td>
-                          <td>
-                            <div>{c.name || c.email || '-'}</div>
-                            {c.is_public && <span className="text-xs text-green-400">公共</span>}
-                          </td>
-                          <td className="text-sm">
-                            {c.owner_name ? (
-                              <span className="text-blue-400">{c.owner_name}</span>
-                            ) : (
-                              <span className="text-gray-500">-</span>
-                            )}
-                          </td>
+                          <td>{c.name}</td>
                           <td className="font-mono text-sm text-gray-400">{c.api_key}</td>
                           <td>{c.total_requests}</td>
+                          <td className={c.failed_requests > 0 ? 'text-red-400' : ''}>
+                            {c.failed_requests}
+                          </td>
                           <td>
                             {c.is_active ? (
                               <span className="text-green-400">活跃</span>
@@ -561,9 +550,8 @@ export default function Admin() {
                   <div className="flex gap-3">
                     <input
                       type="number"
-                      min="0"
                       value={defaultQuota}
-                      onChange={(e) => setDefaultQuota(Math.max(0, parseInt(e.target.value) || 0))}
+                      onChange={(e) => setDefaultQuota(parseInt(e.target.value) || 0)}
                       className="w-32 px-4 py-2 bg-dark-800 border border-dark-600 rounded-lg text-white"
                     />
                     <button onClick={updateDefaultQuota} className="btn btn-primary">
@@ -581,9 +569,8 @@ export default function Admin() {
                   <div className="flex gap-3">
                     <input
                       type="number"
-                      min="0"
                       value={batchQuota}
-                      onChange={(e) => setBatchQuota(Math.max(0, parseInt(e.target.value) || 0))}
+                      onChange={(e) => setBatchQuota(e.target.value)}
                       placeholder="输入配额值"
                       className="w-32 px-4 py-2 bg-dark-800 border border-dark-600 rounded-lg text-white placeholder-gray-500"
                     />
@@ -602,31 +589,6 @@ export default function Admin() {
                   <h3 className="font-semibold mb-4">单独设置用户配额</h3>
                   <p className="text-gray-400 text-sm mb-4">
                     在「用户管理」页面点击用户的配额数值即可单独修改
-                  </p>
-                </div>
-
-                {/* 分类配额说明 */}
-                <div className="card bg-gradient-to-r from-cyan-900/20 to-purple-900/20 border-cyan-600/30">
-                  <h3 className="font-semibold mb-4">📊 分类配额说明</h3>
-                  <p className="text-gray-400 text-sm mb-4">
-                    分类配额允许为不同类型的模型设置独立限制。设置为 0 表示不限制该类型，使用总配额。
-                  </p>
-                  <div className="grid grid-cols-3 gap-4 text-sm">
-                    <div className="bg-cyan-600/20 border border-cyan-600/30 rounded-lg p-3">
-                      <div className="text-cyan-400 font-medium mb-1">Flash 配额</div>
-                      <div className="text-gray-400">gemini-*-flash* 系列模型</div>
-                    </div>
-                    <div className="bg-orange-600/20 border border-orange-600/30 rounded-lg p-3">
-                      <div className="text-orange-400 font-medium mb-1">2.5 Pro 配额</div>
-                      <div className="text-gray-400">gemini-2.5-pro 系列模型</div>
-                    </div>
-                    <div className="bg-pink-600/20 border border-pink-600/30 rounded-lg p-3">
-                      <div className="text-pink-400 font-medium mb-1">3.0 Pro 配额</div>
-                      <div className="text-gray-400">gemini-3-pro, thinking, exp 模型</div>
-                    </div>
-                  </div>
-                  <p className="text-gray-500 text-xs mt-4">
-                    💡 使用 API 修改分类配额: PUT /api/admin/users/&#123;id&#125; 传入 flash_quota, pro25_quota, pro30_quota
                   </p>
                 </div>
               </div>

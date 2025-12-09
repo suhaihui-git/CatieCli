@@ -11,11 +11,10 @@ export default function Stats() {
   const [daily, setDaily] = useState([])
   const [loading, setLoading] = useState(true)
   const [days, setDays] = useState(7)
-  const [statusFilter, setStatusFilter] = useState('all') // all, success, failed
 
   useEffect(() => {
     fetchStats()
-  }, [days, statusFilter])
+  }, [days])
 
   const fetchStats = async () => {
     try {
@@ -25,7 +24,7 @@ export default function Stats() {
         api.get('/api/manage/stats/global'),
         api.get(`/api/manage/stats/by-model?days=${days}`),
         api.get(`/api/manage/stats/by-user?days=${days}`),
-        api.get(`/api/manage/stats/daily?days=${days}&status=${statusFilter}`),
+        api.get(`/api/manage/stats/daily?days=${days}`),
       ])
       setOverview(overviewRes.data)
       setGlobalStats(globalRes.data)
@@ -215,82 +214,32 @@ export default function Stats() {
 
         {/* 每日趋势 */}
         <div className="bg-gray-800 rounded-xl p-6 mt-8">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">📈 近{days}日请求趋势</h2>
-            {/* 状态过滤按钮 */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => setStatusFilter('all')}
-                className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                  statusFilter === 'all' 
-                    ? 'bg-purple-600 text-white' 
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                全部
-              </button>
-              <button
-                onClick={() => setStatusFilter('success')}
-                className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                  statusFilter === 'success' 
-                    ? 'bg-green-600 text-white' 
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                ✓ 成功
-              </button>
-              <button
-                onClick={() => setStatusFilter('failed')}
-                className={`px-3 py-1 rounded-lg text-sm transition-colors ${
-                  statusFilter === 'failed' 
-                    ? 'bg-red-600 text-white' 
-                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                }`}
-              >
-                ✗ 失败
-              </button>
-            </div>
-          </div>
-          {daily.length === 0 ? (
-            <p className="text-gray-400">暂无数据</p>
-          ) : (
-            <>
-              {/* 柱形图区域 */}
-              <div className="flex items-end gap-3 mb-2" style={{ height: '150px' }}>
-                {daily.map((item, idx) => {
-                  const maxCount = Math.max(...daily.map(d => d.count), 1)
-                  const barHeight = Math.max((item.count / maxCount) * 150, 4)
-                  // 根据过滤状态设置颜色
-                  const barColor = statusFilter === 'success' ? '#22c55e' 
-                    : statusFilter === 'failed' ? '#ef4444' 
-                    : '#3b82f6'
-                  return (
-                    <div 
-                      key={idx} 
-                      className="flex-1 flex flex-col items-center justify-end h-full"
-                    >
-                      <span className="text-xs text-gray-400 mb-1">{item.count}</span>
-                      <div
-                        className="w-full rounded-t transition-all hover:opacity-80"
-                        style={{ 
-                          height: `${barHeight}px`,
-                          backgroundColor: item.count > 0 ? barColor : '#4b5563'
-                        }}
-                      />
+          <h2 className="text-xl font-semibold mb-4">📈 每日请求趋势</h2>
+          <div className="h-64 flex items-end gap-1">
+            {daily.length === 0 ? (
+              <p className="text-gray-400">暂无数据</p>
+            ) : (
+              daily.map((item, idx) => {
+                const maxCount = Math.max(...daily.map(d => d.count))
+                const height = maxCount > 0 ? (item.count / maxCount) * 100 : 0
+                return (
+                  <div
+                    key={idx}
+                    className="flex-1 bg-blue-500 rounded-t hover:bg-blue-400 transition-colors relative group"
+                    style={{ height: `${Math.max(height, 2)}%` }}
+                  >
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black px-2 py-1 rounded text-xs opacity-0 group-hover:opacity-100 whitespace-nowrap">
+                      {item.date}: {item.count}
                     </div>
-                  )
-                })}
-              </div>
-              {/* 日期标签 */}
-              <div className="flex gap-3">
-                {daily.map((item, idx) => (
-                  <div key={idx} className="flex-1 text-center">
-                    <span className="text-xs text-gray-500">{item.date?.slice(5) || ''}</span>
                   </div>
-                ))}
-              </div>
-            </>
-          )}
+                )
+              })
+            )}
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-gray-500">
+            <span>{daily[0]?.date || ''}</span>
+            <span>{daily[daily.length - 1]?.date || ''}</span>
+          </div>
         </div>
       </div>
     </div>

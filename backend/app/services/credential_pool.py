@@ -37,7 +37,8 @@ class CredentialPool:
         db: AsyncSession, 
         user_id: int = None,
         user_has_public_creds: bool = False,
-        model: str = None
+        model: str = None,
+        exclude_ids: set = None
     ) -> Optional[Credential]:
         """
         获取一个可用的凭证 (根据模式 + 轮询策略 + 模型等级匹配)
@@ -50,9 +51,15 @@ class CredentialPool:
         模型等级规则:
         - 3.0 模型只能用 3.0 等级的凭证
         - 2.5 模型可以用任何等级的凭证
+        
+        exclude_ids: 排除的凭证ID集合（用于重试时跳过已失败的凭证）
         """
         pool_mode = settings.credential_pool_mode
         query = select(Credential).where(Credential.is_active == True)
+        
+        # 排除已尝试过的凭证
+        if exclude_ids:
+            query = query.where(~Credential.id.in_(exclude_ids))
         
         # 根据模型确定需要的凭证等级
         required_tier = CredentialPool.get_required_tier(model) if model else "2.5"
