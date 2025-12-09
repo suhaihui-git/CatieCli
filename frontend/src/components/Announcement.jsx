@@ -85,14 +85,13 @@ export default function Announcement() {
           )}
         </div>
 
-        {/* 内容 */}
+        {/* 内容（支持 HTML 格式，包括图片） */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <div 
-            className="prose prose-invert prose-sm max-w-none text-gray-300 whitespace-pre-wrap"
+            className="prose prose-invert prose-sm max-w-none text-gray-300"
             style={{ lineHeight: '1.8' }}
-          >
-            {announcement.content}
-          </div>
+            dangerouslySetInnerHTML={{ __html: announcement.content }}
+          />
         </div>
 
         {/* 底部 */}
