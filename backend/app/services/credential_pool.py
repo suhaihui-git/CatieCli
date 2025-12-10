@@ -333,6 +333,7 @@ class CredentialPool:
                     "https://www.googleapis.com/drive/v3/about?fields=storageQuota",
                     headers=headers
                 )
+                print(f"[检测账号] Drive API 响应: {resp.status_code}", flush=True)
                 
                 if resp.status_code == 200:
                     data = resp.json()
@@ -347,6 +348,10 @@ class CredentialPool:
                             return {"account_type": "pro", "storage_gb": storage_gb}
                         else:
                             return {"account_type": "free", "storage_gb": storage_gb}
+                elif resp.status_code == 403:
+                    print(f"[检测账号] Drive API 无权限，回退到连续请求检测", flush=True)
+                else:
+                    print(f"[检测账号] Drive API 意外响应: {resp.status_code}", flush=True)
                             
             except Exception as e:
                 print(f"[检测账号] Drive API 异常: {e}", flush=True)
@@ -365,22 +370,30 @@ class CredentialPool:
                 }
             }
             
-            for i in range(5):
+            # 先等待 2 秒让之前的请求 RPM 窗口过去
+            print(f"[检测账号] 等待 2 秒后开始连续请求检测...", flush=True)
+            await asyncio.sleep(2)
+            
+            for i in range(3):  # 减少到 3 次
                 try:
                     resp = await client.post(url, headers=headers, json=payload)
                     print(f"[检测账号] 第 {i+1} 次请求: {resp.status_code}", flush=True)
                     
                     if resp.status_code == 429:
                         error_text = resp.text.lower()
+                        print(f"[检测账号] 429 详情: {resp.text[:200]}", flush=True)
                         if "per day" not in error_text and "daily" not in error_text:
                             return {"account_type": "free"}
                         return {"account_type": "unknown", "error": "配额已用尽"}
                     elif resp.status_code not in [200]:
+                        print(f"[检测账号] 非200响应: {resp.status_code}", flush=True)
                         return {"account_type": "unknown"}
                         
                 except Exception as e:
+                    print(f"[检测账号] 请求异常: {e}", flush=True)
                     return {"account_type": "unknown", "error": str(e)}
                 
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(1.5)  # 间隔增加到 1.5 秒
             
+            print(f"[检测账号] 3 次请求全部成功，判定为 Pro", flush=True)
             return {"account_type": "pro"}
