@@ -601,25 +601,27 @@ export default function Dashboard() {
             ) : myKey ? (
               <>
                 <div className="bg-dark-800 border border-dark-600 rounded-xl p-4 mb-4">
-                  <div className="flex items-center gap-3">
-                    <code className="flex-1 bg-dark-900 px-4 py-3 rounded-lg text-gray-300 font-mono text-sm overflow-x-auto">
+                  <div className="flex flex-col gap-3">
+                    <code className="bg-dark-900 px-4 py-3 rounded-lg text-gray-300 font-mono text-sm overflow-x-auto break-all">
                       {myKey.key}
                     </code>
-                    <button
-                      onClick={copyKey}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center gap-2"
-                    >
-                      {keyCopied ? <Check size={16} /> : <Copy size={16} />}
-                      {keyCopied ? '已复制' : '复制'}
-                    </button>
-                    <button
-                      onClick={regenerateKey}
-                      disabled={regenerating}
-                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg flex items-center gap-2"
-                    >
-                      <RefreshCcw size={16} className={regenerating ? 'animate-spin' : ''} />
-                      更改
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={copyKey}
+                        className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex items-center justify-center gap-2"
+                      >
+                        {keyCopied ? <Check size={16} /> : <Copy size={16} />}
+                        {keyCopied ? '已复制' : '复制'}
+                      </button>
+                      <button
+                        onClick={regenerateKey}
+                        disabled={regenerating}
+                        className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-lg flex items-center justify-center gap-2"
+                      >
+                        <RefreshCcw size={16} className={regenerating ? 'animate-spin' : ''} />
+                        更改
+                      </button>
+                    </div>
                   </div>
                 </div>
 
