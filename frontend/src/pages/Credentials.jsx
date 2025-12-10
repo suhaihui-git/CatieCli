@@ -29,12 +29,14 @@ export default function Credentials() {
   const [loadingQuota, setLoadingQuota] = useState(false)
   const [verifyResult, setVerifyResult] = useState(null)  // 检测结果弹窗
   const [lockDonate, setLockDonate] = useState(false)
+  const [forceDonate, setForceDonate] = useState(false)
 
   useEffect(() => {
     fetchCredentials()
-    // 获取锁定捐赠配置
+    // 获取捐赠配置
     api.get('/api/manage/public-config').then(res => {
       setLockDonate(res.data.lock_donate || false)
+      setForceDonate(res.data.force_donate || false)
     }).catch(() => {})
   }, [])
 
@@ -249,26 +251,29 @@ export default function Credentials() {
             )}
 
             <div className="flex items-center justify-between">
-              <label className="flex items-center gap-3 cursor-pointer p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={uploadPublic}
-                  onChange={(e) => setUploadPublic(e.target.checked)}
-                  className="w-5 h-5 rounded"
-                />
-                <div>
-                  <div className="text-purple-400 font-medium flex items-center gap-2">
-                    <Gift size={16} />
-                    捐赠到公共池
+              {/* 强制捐赠时隐藏勾选框 */}
+              {!forceDonate && (
+                <label className="flex items-center gap-3 cursor-pointer p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg hover:bg-purple-500/20 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={uploadPublic}
+                    onChange={(e) => setUploadPublic(e.target.checked)}
+                    className="w-5 h-5 rounded"
+                  />
+                  <div>
+                    <div className="text-purple-400 font-medium flex items-center gap-2">
+                      <Gift size={16} />
+                      捐赠到公共池
+                    </div>
+                    <div className="text-xs text-purple-300/70">捐赠后可使用所有公共凭证</div>
                   </div>
-                  <div className="text-xs text-purple-300/70">捐赠后可使用所有公共凭证</div>
-                </div>
-              </label>
+                </label>
+              )}
 
               <button
                 onClick={uploadCredential}
                 disabled={uploading || uploadFiles.length === 0}
-                className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg flex items-center gap-2 font-medium"
+                className={`px-6 py-3 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg flex items-center gap-2 font-medium ${forceDonate ? 'ml-auto' : ''}`}
               >
                 {uploading ? <RefreshCw className="animate-spin" size={18} /> : <Upload size={18} />}
                 {uploading ? '上传中...' : '上传凭证'}
@@ -353,8 +358,8 @@ export default function Credentials() {
                           </span>
                         )}
                         
-                        {/* 捐赠状态 - 紫色边框空心 */}
-                        {cred.is_public && (
+                        {/* 捐赠状态 - 强制捐赠时隐藏 */}
+                        {cred.is_public && !forceDonate && (
                           <span className="text-xs px-2.5 py-1 border border-purple-500 text-purple-400 rounded font-medium">
                             已捐赠
                           </span>
@@ -414,9 +419,8 @@ export default function Credentials() {
                         导出
                       </button>
                       
-                      {/* 捐赠/取消捐赠 */}
-                      {/* 锁定捐赠时，有效已捐赠的凭证隐藏取消按钮 */}
-                      {!(lockDonate && cred.is_public && cred.is_active) && (
+                      {/* 捐赠/取消捐赠 - 强制捐赠时完全隐藏 */}
+                      {!forceDonate && !(lockDonate && cred.is_public && cred.is_active) && (
                         <button
                           onClick={() => togglePublic(cred.id, cred.is_public)}
                           disabled={!cred.is_public && !cred.is_active}
