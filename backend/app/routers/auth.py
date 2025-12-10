@@ -470,8 +470,11 @@ async def update_my_credential(
                 user.daily_quota += settings.credential_reward_quota
                 print(f"[凭证捐赠] 用户 {user.username} 获得 {settings.credential_reward_quota} 额度奖励", flush=True)
         else:
-            # 取消捐赠扣除配额
+            # 取消捐赠
             if cred.is_public:
+                # 检查锁定捐赠（有效凭证不允许取消）
+                if settings.lock_donate and cred.is_active:
+                    raise HTTPException(status_code=400, detail="站长已锁定捐赠，有效凭证不能取消捐赠")
                 user.daily_quota = max(settings.default_daily_quota, user.daily_quota - settings.credential_reward_quota)
                 print(f"[取消捐赠] 用户 {user.username} 扣除 {settings.credential_reward_quota} 额度", flush=True)
         cred.is_public = is_public

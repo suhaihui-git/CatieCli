@@ -59,6 +59,9 @@ class Settings(BaseSettings):
     # 强制捐赠：上传凭证时强制设为公开
     force_donate: bool = False
     
+    # 锁定捐赠：不允许取消捐赠（除非凭证失效）
+    lock_donate: bool = False
+    
     # 公告
     announcement_enabled: bool = False
     announcement_title: str = ""
@@ -97,6 +100,7 @@ PERSISTENT_CONFIG_KEYS = [
     "contributor_rpm",
     "credential_pool_mode",
     "force_donate",
+    "lock_donate",
     "error_retry_count",
     "announcement_enabled",
     "announcement_title",

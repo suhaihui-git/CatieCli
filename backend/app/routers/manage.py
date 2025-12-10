@@ -687,6 +687,7 @@ async def get_config(user: User = Depends(get_current_admin)):
         "admin_username": settings.admin_username,
         "credential_pool_mode": settings.credential_pool_mode,
         "force_donate": settings.force_donate,
+        "lock_donate": settings.lock_donate,
         "announcement_enabled": settings.announcement_enabled,
         "announcement_title": settings.announcement_title,
         "announcement_content": settings.announcement_content,
@@ -714,6 +715,7 @@ async def get_public_config():
     from app.config import settings
     return {
         "force_donate": settings.force_donate,
+        "lock_donate": settings.lock_donate,
         "credential_pool_mode": settings.credential_pool_mode,
     }
 
@@ -731,6 +733,7 @@ async def update_config(
     error_retry_count: Optional[int] = Form(None),
     credential_pool_mode: Optional[str] = Form(None),
     force_donate: Optional[bool] = Form(None),
+    lock_donate: Optional[bool] = Form(None),
     announcement_enabled: Optional[bool] = Form(None),
     announcement_title: Optional[str] = Form(None),
     announcement_content: Optional[str] = Form(None),
@@ -788,6 +791,10 @@ async def update_config(
         settings.force_donate = force_donate
         await save_config_to_db("force_donate", force_donate)
         updated["force_donate"] = force_donate
+    if lock_donate is not None:
+        settings.lock_donate = lock_donate
+        await save_config_to_db("lock_donate", lock_donate)
+        updated["lock_donate"] = lock_donate
     
     # 公告配置
     if announcement_enabled is not None:

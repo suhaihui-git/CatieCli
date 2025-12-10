@@ -28,9 +28,14 @@ export default function Credentials() {
   const [quotaModal, setQuotaModal] = useState(null)  // 存储配额数据
   const [loadingQuota, setLoadingQuota] = useState(false)
   const [verifyResult, setVerifyResult] = useState(null)  // 检测结果弹窗
+  const [lockDonate, setLockDonate] = useState(false)
 
   useEffect(() => {
     fetchCredentials()
+    // 获取锁定捐赠配置
+    api.get('/api/manage/public-config').then(res => {
+      setLockDonate(res.data.lock_donate || false)
+    }).catch(() => {})
   }, [])
 
   const fetchCredentials = async () => {
@@ -410,20 +415,23 @@ export default function Credentials() {
                       </button>
                       
                       {/* 捐赠/取消捐赠 */}
-                      <button
-                        onClick={() => togglePublic(cred.id, cred.is_public)}
-                        disabled={!cred.is_public && !cred.is_active}
-                        title={!cred.is_public && !cred.is_active ? '请先检测凭证有效后再捐赠' : ''}
-                        className={`px-3 py-1.5 rounded text-xs font-medium ${
-                          cred.is_public 
-                            ? 'bg-gray-600 hover:bg-gray-500 text-white' 
-                            : !cred.is_active
-                              ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                              : 'bg-purple-600 hover:bg-purple-500 text-white'
-                        }`}
-                      >
-                        {cred.is_public ? '取消捐赠' : '捐赠'}
-                      </button>
+                      {/* 锁定捐赠时，有效已捐赠的凭证隐藏取消按钮 */}
+                      {!(lockDonate && cred.is_public && cred.is_active) && (
+                        <button
+                          onClick={() => togglePublic(cred.id, cred.is_public)}
+                          disabled={!cred.is_public && !cred.is_active}
+                          title={!cred.is_public && !cred.is_active ? '请先检测凭证有效后再捐赠' : ''}
+                          className={`px-3 py-1.5 rounded text-xs font-medium ${
+                            cred.is_public 
+                              ? 'bg-gray-600 hover:bg-gray-500 text-white' 
+                              : !cred.is_active
+                                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                                : 'bg-purple-600 hover:bg-purple-500 text-white'
+                          }`}
+                        >
+                          {cred.is_public ? '取消捐赠' : '捐赠'}
+                        </button>
+                      )}
                       
                       {/* 删除 */}
                       <button
