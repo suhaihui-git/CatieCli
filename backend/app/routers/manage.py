@@ -952,25 +952,14 @@ async def get_global_stats(
     )
     tier3_creds = tier3_cred_result.scalar() or 0
     
-    # 全站总额度（基于活跃凭证计算）
-    # 活跃公共池凭证数 * 对应配额
+    # 全站总额度（基于所有活跃凭证计算）
     public_active_count = public_creds.scalar() or 0
+    active_count = active_creds.scalar() or 0
     
-    # 统计公共池中各等级凭证数量
-    tier3_public_result = await db.execute(
-        select(func.count(Credential.id)).where(
-            Credential.is_active == True,
-            Credential.is_public == True,
-            Credential.model_tier == "3"
-        )
-    )
-    tier3_public_count = tier3_public_result.scalar() or 0
-    tier25_public_count = public_active_count - tier3_public_count
-    
-    # 计算总额度（使用统计专用配置，与凭证奖励分开）
-    total_quota_flash = public_active_count * settings.stats_quota_flash
-    total_quota_25pro = public_active_count * settings.stats_quota_25pro
-    total_quota_30pro = tier3_public_count * settings.stats_quota_30pro
+    # 计算总额度（基于所有活跃凭证，tier3_creds 已在上方查询）
+    total_quota_flash = active_count * settings.stats_quota_flash
+    total_quota_25pro = active_count * settings.stats_quota_25pro
+    total_quota_30pro = tier3_creds * settings.stats_quota_30pro
     
     # 活跃用户数（最近24小时）
     active_users_result = await db.execute(
