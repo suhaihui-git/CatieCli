@@ -3,10 +3,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from pydantic import BaseModel
 from typing import Optional, List
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from app.database import get_db
-from app.models.user import User, APIKey, UsageLog
+from app.models.user import User, APIKey, UsageLog, Credential
 from app.services.auth import (
     get_password_hash, authenticate_user, create_access_token,
     get_current_user

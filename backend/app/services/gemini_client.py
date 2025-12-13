@@ -288,14 +288,65 @@ class GeminiClient:
             content = msg.get("content", "")
             
             if role == "system":
-                system_instructions.append(content)
+                # system 可能是字符串或列表
+                if isinstance(content, str):
+                    system_instructions.append(content)
+                elif isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, dict) and item.get("type") == "text":
+                            system_instructions.append(item.get("text", ""))
+                        elif isinstance(item, str):
+                            system_instructions.append(item)
                 continue
             
             gemini_role = "user" if role == "user" else "model"
             
+            # 处理多模态内容（图片+文本）
+            parts = []
+            if isinstance(content, str):
+                # 简单文本
+                parts.append({"text": content})
+            elif isinstance(content, list):
+                # 多模态内容列表
+                for item in content:
+                    if isinstance(item, dict):
+                        if item.get("type") == "text":
+                            parts.append({"text": item.get("text", "")})
+                        elif item.get("type") == "image_url":
+                            # 处理图片
+                            image_url = item.get("image_url", {})
+                            url = image_url.get("url", "") if isinstance(image_url, dict) else image_url
+                            if url.startswith("data:"):
+                                # Base64 编码的图片
+                                # 格式: data:image/jpeg;base64,/9j/4AAQ...
+                                try:
+                                    header, base64_data = url.split(",", 1)
+                                    mime_type = header.split(":")[1].split(";")[0]
+                                    parts.append({
+                                        "inlineData": {
+                                            "mimeType": mime_type,
+                                            "data": base64_data
+                                        }
+                                    })
+                                except Exception as e:
+                                    print(f"[GeminiClient] ⚠️ 解析图片数据失败: {e}", flush=True)
+                            else:
+                                # URL 图片
+                                parts.append({
+                                    "fileData": {
+                                        "mimeType": "image/jpeg",
+                                        "fileUri": url
+                                    }
+                                })
+                    elif isinstance(item, str):
+                        parts.append({"text": item})
+            
+            if not parts:
+                parts.append({"text": ""})
+            
             contents.append({
                 "role": gemini_role,
-                "parts": [{"text": content}]
+                "parts": parts
             })
         
         # 构建 systemInstruction
