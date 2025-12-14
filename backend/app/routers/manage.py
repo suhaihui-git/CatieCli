@@ -1002,14 +1002,10 @@ async def get_global_stats(
     active_count = active_creds.scalar() or 0
     public_active_count = public_creds.scalar() or 0
     
-    # 计算总额度（使用前端可配置的值，0表示使用默认值）
-    flash_per_cred = settings.stats_quota_flash if settings.stats_quota_flash > 0 else settings.stats_free_flash
-    pro25_per_cred = settings.stats_quota_25pro if settings.stats_quota_25pro > 0 else settings.stats_free_premium
-    pro30_per_cred = settings.stats_quota_30pro if settings.stats_quota_30pro > 0 else settings.stats_free_premium
-    
-    total_quota_flash = active_count * flash_per_cred
-    total_quota_25pro = active_count * pro25_per_cred
-    total_quota_30pro = tier3_creds * pro30_per_cred
+    # 计算总额度（直接使用前端配置的值）
+    total_quota_flash = active_count * settings.stats_quota_flash
+    total_quota_25pro = active_count * settings.stats_quota_25pro
+    total_quota_30pro = tier3_creds * settings.stats_quota_30pro
     
     # 活跃用户数（最近24小时）
     active_users_result = await db.execute(
