@@ -139,6 +139,20 @@ export default function Stats() {
               </div>
             </div>
 
+            {/* 总配额汇总 */}
+            <div className="bg-gray-700/30 rounded-lg p-3 mb-4 text-center">
+              <span className="text-gray-400">总配额计算: </span>
+              <span className="text-cyan-400">{globalStats.total_quota?.flash ?? 0}</span>
+              <span className="text-gray-500"> + </span>
+              <span className="text-orange-400">{globalStats.total_quota?.['pro_2.5'] ?? 0}</span>
+              <span className="text-gray-500"> + </span>
+              <span className="text-pink-400">{globalStats.total_quota?.tier_3 ?? 0}</span>
+              <span className="text-gray-500"> = </span>
+              <span className="text-xl font-bold text-green-400">
+                {(globalStats.total_quota?.flash ?? 0) + (globalStats.total_quota?.['pro_2.5'] ?? 0) + (globalStats.total_quota?.tier_3 ?? 0)} 总配额
+              </span>
+            </div>
+
             {/* 凭证状态 */}
             <div className="flex items-center gap-4 text-sm text-gray-400">
               <span>凭证: {globalStats.credentials.active}/{globalStats.credentials.total} 活跃</span>
