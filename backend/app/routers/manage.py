@@ -707,6 +707,9 @@ async def get_config(user: User = Depends(get_current_admin)):
         "announcement_title": settings.announcement_title,
         "announcement_content": settings.announcement_content,
         "announcement_read_seconds": settings.announcement_read_seconds,
+        "stats_quota_flash": settings.stats_quota_flash,
+        "stats_quota_25pro": settings.stats_quota_25pro,
+        "stats_quota_30pro": settings.stats_quota_30pro,
     }
 
 
@@ -764,6 +767,9 @@ async def update_config(
     announcement_title: Optional[str] = Form(None),
     announcement_content: Optional[str] = Form(None),
     announcement_read_seconds: Optional[int] = Form(None),
+    stats_quota_flash: Optional[int] = Form(None),
+    stats_quota_25pro: Optional[int] = Form(None),
+    stats_quota_30pro: Optional[int] = Form(None),
     user: User = Depends(get_current_admin)
 ):
     """更新配置（持久化保存到数据库）"""
@@ -875,6 +881,20 @@ async def update_config(
         settings.announcement_read_seconds = announcement_read_seconds
         await save_config_to_db("announcement_read_seconds", announcement_read_seconds)
         updated["announcement_read_seconds"] = announcement_read_seconds
+    
+    # 全站统计额度配置
+    if stats_quota_flash is not None:
+        settings.stats_quota_flash = stats_quota_flash
+        await save_config_to_db("stats_quota_flash", stats_quota_flash)
+        updated["stats_quota_flash"] = stats_quota_flash
+    if stats_quota_25pro is not None:
+        settings.stats_quota_25pro = stats_quota_25pro
+        await save_config_to_db("stats_quota_25pro", stats_quota_25pro)
+        updated["stats_quota_25pro"] = stats_quota_25pro
+    if stats_quota_30pro is not None:
+        settings.stats_quota_30pro = stats_quota_30pro
+        await save_config_to_db("stats_quota_30pro", stats_quota_30pro)
+        updated["stats_quota_30pro"] = stats_quota_30pro
     
     return {"message": "配置已保存", "updated": updated}
 

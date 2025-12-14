@@ -53,6 +53,9 @@ export default function Settings() {
       formData.append('announcement_title', config.announcement_title || '')
       formData.append('announcement_content', config.announcement_content || '')
       formData.append('announcement_read_seconds', config.announcement_read_seconds || 5)
+      formData.append('stats_quota_flash', config.stats_quota_flash || 1000)
+      formData.append('stats_quota_25pro', config.stats_quota_25pro || 250)
+      formData.append('stats_quota_30pro', config.stats_quota_30pro || 200)
       
       await api.post('/api/manage/config', formData)
       setMessage({ type: 'success', text: '配置已保存！' })
@@ -198,6 +201,44 @@ export default function Settings() {
             />
             <p className="text-gray-500 text-sm mt-2">
               💡 允许2.5凭证用户体验3.0模型，设为0则只有3.0凭证用户可用
+            </p>
+          </div>
+
+          {/* 全站统计额度配置 */}
+          <div>
+            <h3 className="font-semibold mb-2">全站统计额度 📊</h3>
+            <p className="text-gray-400 text-sm mb-3">统计页面显示的每个凭证贡献的额度基数</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">Flash 额度/凭证</label>
+                <input
+                  type="number"
+                  value={config?.stats_quota_flash ?? ''}
+                  onChange={(e) => setConfig({ ...config, stats_quota_flash: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                  className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">2.5 Pro 额度/凭证</label>
+                <input
+                  type="number"
+                  value={config?.stats_quota_25pro ?? ''}
+                  onChange={(e) => setConfig({ ...config, stats_quota_25pro: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                  className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">3.0 额度/凭证</label>
+                <input
+                  type="number"
+                  value={config?.stats_quota_30pro ?? ''}
+                  onChange={(e) => setConfig({ ...config, stats_quota_30pro: e.target.value === '' ? '' : parseInt(e.target.value) })}
+                  className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                />
+              </div>
+            </div>
+            <p className="text-gray-500 text-sm mt-2">
+              💡 统计页显示: Flash={config?.stats_quota_flash || 1000}×活跃凭证数, 2.5Pro={config?.stats_quota_25pro || 250}×活跃凭证数, 3.0={config?.stats_quota_30pro || 200}×3.0凭证数
             </p>
           </div>
 
