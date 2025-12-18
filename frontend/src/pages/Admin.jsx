@@ -285,6 +285,22 @@ export default function Admin() {
     }
   }
 
+  const deleteDuplicates = async () => {
+    if (!confirm(`确定要删除所有重复凭证吗？\n\n将保留每组最早上传的凭证，删除其他 ${duplicateModal.data?.duplicate_count || 0} 个重复凭证。\n\n此操作不可撤销！`)) {
+      return
+    }
+    setDuplicateModal(prev => ({ ...prev, loading: true }))
+    try {
+      const res = await api.delete('/api/admin/credentials/duplicates')
+      showAlert('清除成功', res.data.message, 'success')
+      setDuplicateModal({ open: false, data: null, loading: false })
+      fetchCredentials()
+    } catch (err) {
+      setDuplicateModal(prev => ({ ...prev, loading: false }))
+      showAlert('清除失败', err.response?.data?.detail || err.message, 'error')
+    }
+  }
+
   const tabs = [
     { id: 'users', label: '用户管理', icon: Users },
     { id: 'credentials', label: '凭证池', icon: Key },
@@ -1041,9 +1057,19 @@ export default function Admin() {
                 <div className="text-center py-8 text-gray-400">检测中...</div>
               ) : duplicateModal.data ? (
                 <div className="space-y-4">
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-gray-400">总凭证数: <span className="text-white">{duplicateModal.data.total_credentials}</span></span>
-                    <span className="text-yellow-400">重复凭证数: <span className="font-bold">{duplicateModal.data.duplicate_count}</span></span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 text-sm">
+                      <span className="text-gray-400">总凭证数: <span className="text-white">{duplicateModal.data.total_credentials}</span></span>
+                      <span className="text-yellow-400">重复凭证数: <span className="font-bold">{duplicateModal.data.duplicate_count}</span></span>
+                    </div>
+                    {duplicateModal.data.duplicate_count > 0 && (
+                      <button
+                        onClick={deleteDuplicates}
+                        className="btn bg-red-600 hover:bg-red-500 text-white text-sm px-4 py-2"
+                      >
+                        🗑️ 一键清除重复 ({duplicateModal.data.duplicate_count})
+                      </button>
+                    )}
                   </div>
                   
                   {duplicateModal.data.duplicates.length === 0 ? (

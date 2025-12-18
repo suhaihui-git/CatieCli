@@ -465,6 +465,68 @@ async def check_duplicate_credentials(
     }
 
 
+@router.delete("/credentials/duplicates")
+async def delete_duplicate_credentials(
+    admin: User = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """删除重复凭证（保留每组最早上传的，删除其他重复的）"""
+    from app.services.crypto import decrypt_credential
+    from collections import defaultdict
+    
+    # 获取所有凭证，按创建时间升序
+    result = await db.execute(
+        select(Credential).order_by(Credential.created_at.asc())
+    )
+    credentials = result.scalars().all()
+    
+    # 按邮箱分组
+    email_groups = defaultdict(list)
+    # 按 refresh_token 分组
+    token_groups = defaultdict(list)
+    
+    for c in credentials:
+        # 按邮箱分组
+        if c.email:
+            email_groups[c.email].append(c.id)
+        
+        # 按 refresh_token 分组
+        if c.refresh_token:
+            try:
+                token = decrypt_credential(c.refresh_token)
+                token_key = token[:50] if token else None
+                if token_key:
+                    token_groups[token_key].append(c.id)
+            except:
+                pass
+    
+    # 找出需要删除的ID（保留每组第一个，删除其他）
+    ids_to_delete = set()
+    
+    for email, ids in email_groups.items():
+        if len(ids) > 1:
+            # 保留第一个（最早），删除其他
+            ids_to_delete.update(ids[1:])
+    
+    for token_key, ids in token_groups.items():
+        if len(ids) > 1:
+            ids_to_delete.update(ids[1:])
+    
+    if not ids_to_delete:
+        return {"deleted_count": 0, "message": "没有需要删除的重复凭证"}
+    
+    # 批量删除
+    await db.execute(
+        delete(Credential).where(Credential.id.in_(ids_to_delete))
+    )
+    await db.commit()
+    
+    return {
+        "deleted_count": len(ids_to_delete),
+        "message": f"已删除 {len(ids_to_delete)} 个重复凭证"
+    }
+
+
 # ===== 统计 =====
 @router.get("/stats")
 async def get_stats(
