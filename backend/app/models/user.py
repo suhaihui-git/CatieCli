@@ -96,6 +96,10 @@ class Credential(Base):
     last_used_at = Column(DateTime, nullable=True)
     last_error = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # CD 机制：按模型组记录最后使用时间
+    last_used_flash = Column(DateTime, nullable=True)  # Flash 模型组 CD
+    last_used_pro = Column(DateTime, nullable=True)    # Pro 模型组 CD
+    last_used_30 = Column(DateTime, nullable=True)     # 3.0 模型组 CD
     
     # 关系
     owner = relationship("User", back_populates="credentials")

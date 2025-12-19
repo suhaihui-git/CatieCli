@@ -840,6 +840,9 @@ async def get_config(user: User = Depends(get_current_admin)):
         "base_rpm": settings.base_rpm,
         "contributor_rpm": settings.contributor_rpm,
         "error_retry_count": settings.error_retry_count,
+        "cd_flash": settings.cd_flash,
+        "cd_pro": settings.cd_pro,
+        "cd_30": settings.cd_30,
         "admin_username": settings.admin_username,
         "credential_pool_mode": settings.credential_pool_mode,
         "force_donate": settings.force_donate,
@@ -901,6 +904,9 @@ async def update_config(
     base_rpm: Optional[int] = Form(None),
     contributor_rpm: Optional[int] = Form(None),
     error_retry_count: Optional[int] = Form(None),
+    cd_flash: Optional[int] = Form(None),
+    cd_pro: Optional[int] = Form(None),
+    cd_30: Optional[int] = Form(None),
     credential_pool_mode: Optional[str] = Form(None),
     force_donate: Optional[bool] = Form(None),
     lock_donate: Optional[bool] = Form(None),
@@ -996,6 +1002,18 @@ async def update_config(
         settings.error_retry_count = error_retry_count
         await save_config_to_db("error_retry_count", error_retry_count)
         updated["error_retry_count"] = error_retry_count
+    if cd_flash is not None:
+        settings.cd_flash = cd_flash
+        await save_config_to_db("cd_flash", cd_flash)
+        updated["cd_flash"] = cd_flash
+    if cd_pro is not None:
+        settings.cd_pro = cd_pro
+        await save_config_to_db("cd_pro", cd_pro)
+        updated["cd_pro"] = cd_pro
+    if cd_30 is not None:
+        settings.cd_30 = cd_30
+        await save_config_to_db("cd_30", cd_30)
+        updated["cd_30"] = cd_30
     if force_donate is not None:
         settings.force_donate = force_donate
         await save_config_to_db("force_donate", force_donate)

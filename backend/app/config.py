@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     # 错误重试
     error_retry_count: int = 3  # 报错时切换凭证重试次数
     
+    # CD 机制（冷却时间，单位：秒）
+    cd_flash: int = 0   # Flash 模型组 CD（0=无CD）
+    cd_pro: int = 4     # Pro 模型组 CD（默认4秒）
+    cd_30: int = 4      # 3.0 模型组 CD（默认4秒）
+    
     # 注册
     allow_registration: bool = True
     discord_only_registration: bool = False  # 仅允许通过 Discord Bot 注册
@@ -138,6 +143,9 @@ PERSISTENT_CONFIG_KEYS = [
     "force_donate",
     "lock_donate",
     "error_retry_count",
+    "cd_flash",
+    "cd_pro",
+    "cd_30",
     "announcement_enabled",
     "announcement_title",
     "announcement_content",

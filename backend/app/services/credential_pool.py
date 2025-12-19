@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update, or_
 from app.models.user import Credential
@@ -19,6 +19,55 @@ class CredentialPool:
         if "gemini-3-" in model_lower or "/gemini-3-" in model_lower:
             return "3"
         return "2.5"
+    
+    @staticmethod
+    def get_model_group(model: str) -> str:
+        """
+        根据模型名确定模型组（用于 CD 机制）
+        返回: "flash", "pro", "30"
+        """
+        if not model:
+            return "flash"
+        model_lower = model.lower()
+        # 3.0 模型
+        if "gemini-3-" in model_lower or "/gemini-3-" in model_lower:
+            return "30"
+        # Pro 模型
+        if "pro" in model_lower:
+            return "pro"
+        # 默认 Flash
+        return "flash"
+    
+    @staticmethod
+    def get_cd_seconds(model_group: str) -> int:
+        """获取模型组的 CD 时间（秒）"""
+        if model_group == "30":
+            return settings.cd_30
+        elif model_group == "pro":
+            return settings.cd_pro
+        else:
+            return settings.cd_flash
+    
+    @staticmethod
+    def is_credential_in_cd(credential: Credential, model_group: str) -> bool:
+        """检查凭证在指定模型组是否处于 CD 中"""
+        cd_seconds = CredentialPool.get_cd_seconds(model_group)
+        if cd_seconds <= 0:
+            return False
+        
+        # 获取对应模型组的最后使用时间
+        if model_group == "30":
+            last_used = credential.last_used_30
+        elif model_group == "pro":
+            last_used = credential.last_used_pro
+        else:
+            last_used = credential.last_used_flash
+        
+        if not last_used:
+            return False
+        
+        cd_end_time = last_used + timedelta(seconds=cd_seconds)
+        return datetime.utcnow() < cd_end_time
     
     @staticmethod
     async def check_user_has_tier3_creds(db: AsyncSession, user_id: int) -> bool:
@@ -153,6 +202,9 @@ class CredentialPool:
                 # 用户没有贡献，只能用自己的凭证
                 query = query.where(Credential.user_id == user_id)
         
+        # 确定模型组（用于 CD 筛选）
+        model_group = CredentialPool.get_model_group(model) if model else "flash"
+        
         result = await db.execute(
             query.order_by(Credential.last_used_at.asc().nullsfirst())
         )
@@ -161,12 +213,33 @@ class CredentialPool:
         if not credentials:
             return None
         
-        # 选择最久未使用的凭证
-        credential = credentials[0]
+        # 筛选不在 CD 中的凭证
+        available_credentials = [
+            c for c in credentials 
+            if not CredentialPool.is_credential_in_cd(c, model_group)
+        ]
+        
+        if not available_credentials:
+            # 所有凭证都在 CD 中，返回 CD 剩余时间最短的
+            print(f"[CD] 所有凭证都在 CD 中，选择 CD 剩余时间最短的", flush=True)
+            credential = credentials[0]
+        else:
+            # 选择最久未使用的凭证
+            credential = available_credentials[0]
         
         # 更新使用时间和计数
-        credential.last_used_at = datetime.utcnow()
+        now = datetime.utcnow()
+        credential.last_used_at = now
         credential.total_requests += 1
+        
+        # 更新对应模型组的 CD 时间
+        if model_group == "30":
+            credential.last_used_30 = now
+        elif model_group == "pro":
+            credential.last_used_pro = now
+        else:
+            credential.last_used_flash = now
+        
         await db.commit()
         
         return credential

@@ -47,6 +47,9 @@ async def init_db():
             "ALTER TABLE users ADD COLUMN quota_25pro INTEGER DEFAULT 0",
             "ALTER TABLE users ADD COLUMN quota_30pro INTEGER DEFAULT 0",
             "ALTER TABLE credentials ADD COLUMN account_type VARCHAR(20) DEFAULT 'free'",
+            "ALTER TABLE credentials ADD COLUMN last_used_flash DATETIME",
+            "ALTER TABLE credentials ADD COLUMN last_used_pro DATETIME",
+            "ALTER TABLE credentials ADD COLUMN last_used_30 DATETIME",
         ]
         for sql in migrations:
             try:

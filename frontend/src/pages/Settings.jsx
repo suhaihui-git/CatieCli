@@ -46,6 +46,9 @@ export default function Settings() {
       formData.append('base_rpm', config.base_rpm)
       formData.append('contributor_rpm', config.contributor_rpm)
       formData.append('error_retry_count', config.error_retry_count)
+      formData.append('cd_flash', config.cd_flash ?? 0)
+      formData.append('cd_pro', config.cd_pro ?? 4)
+      formData.append('cd_30', config.cd_30 ?? 4)
       formData.append('credential_pool_mode', config.credential_pool_mode)
       formData.append('force_donate', config.force_donate)
       formData.append('lock_donate', config.lock_donate)
@@ -387,6 +390,47 @@ export default function Settings() {
             <p className="text-gray-500 text-sm mt-1">设为 0 则不重试，直接返回错误</p>
             <p className="text-blue-400 text-sm mt-2">
               💡 当凭证请求失败时，系统会自动尝试切换到其他可用凭证重试
+            </p>
+          </div>
+
+          {/* CD 机制 */}
+          <div>
+            <h3 className="font-semibold mb-2">凭证冷却时间 (CD) ⏱️</h3>
+            <p className="text-gray-400 text-sm mb-3">按模型组设置凭证冷却时间，避免同一凭证被频繁调用（0=无CD）</p>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">Flash CD (秒)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={config?.cd_flash ?? 0}
+                  onChange={(e) => setConfig({ ...config, cd_flash: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                  className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">Pro CD (秒)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={config?.cd_pro ?? 4}
+                  onChange={(e) => setConfig({ ...config, cd_pro: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                  className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-orange-500"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">3.0 CD (秒)</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={config?.cd_30 ?? 4}
+                  onChange={(e) => setConfig({ ...config, cd_30: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                  className="w-full bg-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-pink-500"
+                />
+              </div>
+            </div>
+            <p className="text-gray-500 text-sm mt-2">
+              💡 同一凭证在 CD 期间内不会被同模型组再次选中，优先选择已冷却的凭证
             </p>
           </div>
 
