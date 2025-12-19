@@ -204,6 +204,7 @@ class CredentialPool:
         
         # 确定模型组（用于 CD 筛选）
         model_group = CredentialPool.get_model_group(model) if model else "flash"
+        cd_seconds = CredentialPool.get_cd_seconds(model_group)
         
         result = await db.execute(
             query.order_by(Credential.last_used_at.asc().nullsfirst())
@@ -219,13 +220,18 @@ class CredentialPool:
             if not CredentialPool.is_credential_in_cd(c, model_group)
         ]
         
+        total_count = len(credentials)
+        available_count = len(available_credentials)
+        in_cd_count = total_count - available_count
+        
         if not available_credentials:
-            # 所有凭证都在 CD 中，返回 CD 剩余时间最短的
-            print(f"[CD] 所有凭证都在 CD 中，选择 CD 剩余时间最短的", flush=True)
+            # 所有凭证都在 CD 中，选择第一个（按 last_used_at 排序的）
             credential = credentials[0]
+            print(f"[CD] 模型组={model_group}, CD={cd_seconds}秒 | 全部{total_count}个凭证都在CD中，选择: {credential.email}", flush=True)
         else:
             # 选择最久未使用的凭证
             credential = available_credentials[0]
+            print(f"[CD] 模型组={model_group}, CD={cd_seconds}秒 | 可用{available_count}/{total_count}个, 选择: {credential.email}", flush=True)
         
         # 更新使用时间和计数
         now = datetime.utcnow()
