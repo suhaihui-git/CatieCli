@@ -283,7 +283,7 @@ export default function Admin() {
   const checkDuplicates = async () => {
     setDuplicateModal({ open: true, data: null, loading: true })
     try {
-      const res = await api.get('/api/admin/credentials/duplicates')
+      const res = await api.get('/api/admin/credential-duplicates')
       setDuplicateModal({ open: true, data: res.data, loading: false })
     } catch (err) {
       setDuplicateModal({ open: false, data: null, loading: false })
@@ -297,7 +297,7 @@ export default function Admin() {
     }
     setDuplicateModal(prev => ({ ...prev, loading: true }))
     try {
-      const res = await api.delete('/api/admin/credentials/duplicates')
+      const res = await api.delete('/api/admin/credential-duplicates')
       showAlert('清除成功', res.data.message, 'success')
       setDuplicateModal({ open: false, data: null, loading: false })
       fetchCredentials()

@@ -389,7 +389,7 @@ async def export_all_credentials(
     return export_data
 
 
-@router.get("/credentials/duplicates")
+@router.get("/credential-duplicates")
 async def check_duplicate_credentials(
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
@@ -480,7 +480,7 @@ async def check_duplicate_credentials(
     }
 
 
-@router.delete("/credentials/duplicates")
+@router.delete("/credential-duplicates")
 async def delete_duplicate_credentials(
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
