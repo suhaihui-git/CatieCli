@@ -18,6 +18,7 @@ from app.services.auth import get_current_user, get_current_admin
 from app.services.crypto import encrypt_credential, decrypt_credential
 from app.services.websocket import notify_stats_update
 from app.config import settings
+from app.cache import cache
 
 router = APIRouter(prefix="/api/manage", tags=["管理功能"])
 
@@ -1065,7 +1066,12 @@ async def get_global_stats(
     user: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """获取全站统计（按模型分类）"""
+    """获取全站统计（按模型分类）- 带缓存"""
+    # 尝试从缓存获取（缓存5秒）
+    cached_stats = cache.get("stats:global")
+    if cached_stats:
+        return cached_stats
+    
     now = datetime.utcnow()
     hour_ago = now - timedelta(hours=1)
     day_ago = now - timedelta(days=1)
@@ -1337,5 +1343,10 @@ async def get_global_stats(
             "recent": recent_errors,
         },
     }
+    
+    # 缓存结果5秒
+    cache.set("stats:global", result, ttl=5)
+    
+    return result
 
 

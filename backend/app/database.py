@@ -96,3 +96,22 @@ async def init_db():
             except Exception as e:
                 if "duplicate column" not in str(e).lower() and "already exists" not in str(e).lower():
                     pass  # 列已存在，忽略
+        
+        # 创建索引优化查询性能
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_usage_logs_created_at ON usage_logs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_usage_logs_user_id ON usage_logs(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_usage_logs_status_code ON usage_logs(status_code)",
+            "CREATE INDEX IF NOT EXISTS idx_usage_logs_user_created ON usage_logs(user_id, created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_is_active ON credentials(is_active)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_is_public ON credentials(is_public)",
+            "CREATE INDEX IF NOT EXISTS idx_credentials_user_id ON credentials(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id)",
+        ]
+        
+        for sql in indexes:
+            try:
+                await conn.execute(text(sql))
+                print(f"[DB Index] ✅ {sql[30:70]}...")
+            except Exception as e:
+                pass  # 索引已存在，忽略
