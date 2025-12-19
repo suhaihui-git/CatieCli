@@ -64,13 +64,13 @@ export default function Stats() {
   return (
     <div className="min-h-screen bg-gray-900 text-white p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">📊 使用统计</h1>
-          <div className="flex gap-4 items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold whitespace-nowrap">📊 使用统计</h1>
+          <div className="flex gap-2 sm:gap-4 items-center flex-wrap">
             <select
               value={days}
               onChange={(e) => setDays(Number(e.target.value))}
-              className="bg-gray-800 text-white px-3 py-2 rounded-lg"
+              className="bg-gray-800 text-white px-3 py-2 rounded-lg text-sm"
             >
               <option value={7}>最近 7 天</option>
               <option value={14}>最近 14 天</option>
@@ -78,7 +78,7 @@ export default function Stats() {
             </select>
             <button
               onClick={() => navigate('/dashboard')}
-              className="px-4 py-2 bg-gray-700 rounded-lg hover:bg-gray-600"
+              className="px-3 sm:px-4 py-2 bg-gray-700 rounded-lg hover:bg-gray-600 text-sm"
             >
               返回仪表盘
             </button>

@@ -30,6 +30,7 @@ export default function Admin() {
   const [logs, setLogs] = useState([])
   const [loading, setLoading] = useState(true)
   const [errorStats, setErrorStats] = useState({ by_code: {}, recent: [] })
+  const [expandedErrors, setExpandedErrors] = useState({})  // 展开状态 { '429': true, '401': false }
 
   // 添加凭证表单
   const [newCredName, setNewCredName] = useState('')
@@ -972,8 +973,8 @@ export default function Admin() {
                   
                   {Object.keys(errorStats.by_code || {}).length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
-                      <AlertTriangle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p>今日暂无报错 🎉</p>
+                      <Check className="w-12 h-12 mx-auto mb-3 text-green-500/50" />
+                      <p>今日暂无报错</p>
                     </div>
                   ) : (
                     <>
