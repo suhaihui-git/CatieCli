@@ -608,16 +608,63 @@ async def get_stats(
 @router.get("/logs")
 async def get_logs(
     limit: int = 100,
+    page: int = 1,
+    start_date: str = None,  # YYYY-MM-DD
+    end_date: str = None,    # YYYY-MM-DD
+    username: str = None,
+    model: str = None,
+    status: str = None,      # success, error, all
     admin: User = Depends(get_current_admin),
     db: AsyncSession = Depends(get_db)
 ):
-    """获取使用日志"""
-    result = await db.execute(
-        select(UsageLog, User.username)
-        .join(User, UsageLog.user_id == User.id)
-        .order_by(UsageLog.created_at.desc())
-        .limit(limit)
-    )
+    """获取使用日志（支持分页和筛选）"""
+    from datetime import datetime
+    
+    query = select(UsageLog, User.username).join(User, UsageLog.user_id == User.id)
+    count_query = select(func.count(UsageLog.id)).select_from(UsageLog).join(User, UsageLog.user_id == User.id)
+    
+    # 时间范围筛选
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+            query = query.where(UsageLog.created_at >= start_dt)
+            count_query = count_query.where(UsageLog.created_at >= start_dt)
+        except: pass
+    
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)
+            query = query.where(UsageLog.created_at < end_dt)
+            count_query = count_query.where(UsageLog.created_at < end_dt)
+        except: pass
+    
+    # 用户名筛选
+    if username:
+        query = query.where(User.username.ilike(f"%{username}%"))
+        count_query = count_query.where(User.username.ilike(f"%{username}%"))
+    
+    # 模型筛选
+    if model:
+        query = query.where(UsageLog.model.ilike(f"%{model}%"))
+        count_query = count_query.where(UsageLog.model.ilike(f"%{model}%"))
+    
+    # 状态筛选
+    if status == "success":
+        query = query.where(UsageLog.status_code == 200)
+        count_query = count_query.where(UsageLog.status_code == 200)
+    elif status == "error":
+        query = query.where(UsageLog.status_code != 200)
+        count_query = count_query.where(UsageLog.status_code != 200)
+    
+    # 获取总数
+    total_result = await db.execute(count_query)
+    total = total_result.scalar() or 0
+    
+    # 分页
+    offset = (page - 1) * limit
+    query = query.order_by(UsageLog.created_at.desc()).offset(offset).limit(limit)
+    
+    result = await db.execute(query)
     logs = result.all()
     
     return {
@@ -630,10 +677,14 @@ async def get_logs(
                 "status_code": log.UsageLog.status_code,
                 "latency_ms": log.UsageLog.latency_ms,
                 "cd_seconds": log.UsageLog.cd_seconds,
-                "created_at": log.UsageLog.created_at.isoformat() + "Z"  # 标记为 UTC 时间
+                "created_at": log.UsageLog.created_at.isoformat() + "Z"
             }
             for log in logs
-        ]
+        ],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit if limit > 0 else 1
     }
 
 

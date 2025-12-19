@@ -381,27 +381,52 @@ export default function Admin() {
     }))
   }
 
-  // 使用日志：搜索、分页
+  // 使用日志：搜索、分页、筛选
   const [logSearch, setLogSearch] = useState('')
   const [logPage, setLogPage] = useState(1)
-  const logsPerPage = 30
+  const [logStatus, setLogStatus] = useState('all')  // all, success, error
+  const [logStartDate, setLogStartDate] = useState('')
+  const [logEndDate, setLogEndDate] = useState('')
+  const [logTotal, setLogTotal] = useState(0)
+  const [logPages, setLogPages] = useState(1)
+  const logsPerPage = 50
 
-  const processedLogs = (() => {
-    let result = [...logs]
-    if (logSearch.trim()) {
-      const search = logSearch.toLowerCase()
-      result = result.filter(log => 
-        log.username?.toLowerCase().includes(search) ||
-        log.model?.toLowerCase().includes(search) ||
-        log.endpoint?.toLowerCase().includes(search) ||
-        String(log.status_code).includes(search)
-      )
+  // 获取日志数据（带筛选）
+  const fetchLogs = async () => {
+    try {
+      const params = new URLSearchParams()
+      params.append('limit', logsPerPage)
+      params.append('page', logPage)
+      if (logStartDate) params.append('start_date', logStartDate)
+      if (logEndDate) params.append('end_date', logEndDate)
+      if (logSearch) params.append('username', logSearch)
+      if (logStatus !== 'all') params.append('status', logStatus)
+      
+      const res = await api.get(`/api/admin/logs?${params.toString()}`)
+      setLogs(res.data.logs)
+      setLogTotal(res.data.total)
+      setLogPages(res.data.pages)
+    } catch (err) {
+      console.error('获取日志失败', err)
     }
-    return result
-  })()
+  }
 
-  const totalLogPages = Math.ceil(processedLogs.length / logsPerPage)
-  const paginatedLogs = processedLogs.slice((logPage - 1) * logsPerPage, logPage * logsPerPage)
+  // 日志筛选变化时重新获取
+  useEffect(() => {
+    if (tab === 'logs') {
+      fetchLogs()
+    }
+  }, [tab, logPage, logStatus, logStartDate, logEndDate])
+
+  // 搜索防抖
+  useEffect(() => {
+    if (tab !== 'logs') return
+    const timer = setTimeout(() => {
+      setLogPage(1)
+      fetchLogs()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [logSearch])
 
   // 配额设置相关
   const [defaultQuota, setDefaultQuota] = useState(100)
@@ -861,18 +886,45 @@ export default function Admin() {
             {/* 使用日志 */}
             {tab === 'logs' && (
               <div className="space-y-4">
-                {/* 搜索 */}
-                <div className="flex items-center gap-4">
+                {/* 筛选器 */}
+                <div className="flex flex-wrap items-center gap-3">
                   <input
                     type="text"
-                    placeholder="搜索用户、模型、端点..."
+                    placeholder="搜索用户名..."
                     value={logSearch}
-                    onChange={(e) => { setLogSearch(e.target.value); setLogPage(1) }}
-                    className="px-4 py-2 bg-dark-800 border border-dark-600 rounded-lg text-white placeholder-gray-500 w-64"
+                    onChange={(e) => setLogSearch(e.target.value)}
+                    className="px-3 py-2 bg-dark-800 border border-dark-600 rounded-lg text-white placeholder-gray-500 w-40"
                   />
-                  <span className="text-gray-400 text-sm">
-                    共 {processedLogs.length} 条
-                    {logSearch && ` (筛选自 ${logs.length} 条)`}
+                  <input
+                    type="date"
+                    value={logStartDate}
+                    onChange={(e) => { setLogStartDate(e.target.value); setLogPage(1) }}
+                    className="px-3 py-2 bg-dark-800 border border-dark-600 rounded-lg text-white"
+                  />
+                  <span className="text-gray-500">至</span>
+                  <input
+                    type="date"
+                    value={logEndDate}
+                    onChange={(e) => { setLogEndDate(e.target.value); setLogPage(1) }}
+                    className="px-3 py-2 bg-dark-800 border border-dark-600 rounded-lg text-white"
+                  />
+                  <select
+                    value={logStatus}
+                    onChange={(e) => { setLogStatus(e.target.value); setLogPage(1) }}
+                    className="px-3 py-2 bg-dark-800 border border-dark-600 rounded-lg text-white"
+                  >
+                    <option value="all">全部状态</option>
+                    <option value="success">成功</option>
+                    <option value="error">报错</option>
+                  </select>
+                  <button
+                    onClick={() => { setLogStartDate(''); setLogEndDate(''); setLogSearch(''); setLogStatus('all'); setLogPage(1) }}
+                    className="px-3 py-2 bg-dark-700 hover:bg-dark-600 rounded-lg text-gray-400"
+                  >
+                    重置
+                  </button>
+                  <span className="text-gray-400 text-sm ml-auto">
+                    共 {logTotal} 条记录
                   </span>
                 </div>
 
@@ -889,7 +941,7 @@ export default function Admin() {
                       </tr>
                     </thead>
                     <tbody>
-                      {paginatedLogs.map(log => (
+                      {logs.map(log => (
                         <tr key={log.id}>
                           <td className="text-gray-400 text-sm whitespace-nowrap">
                             {new Date(log.created_at).toLocaleString()}
@@ -915,7 +967,7 @@ export default function Admin() {
                 </div>
 
                 {/* 分页 */}
-                {totalLogPages > 1 && (
+                {logPages > 1 && (
                   <div className="flex items-center justify-center gap-2 mt-4">
                     <button
                       onClick={() => setLogPage(1)}
@@ -932,18 +984,18 @@ export default function Admin() {
                       上一页
                     </button>
                     <span className="px-4 py-1 text-gray-400">
-                      第 {logPage} / {totalLogPages} 页
+                      第 {logPage} / {logPages} 页
                     </span>
                     <button
-                      onClick={() => setLogPage(p => Math.min(totalLogPages, p + 1))}
-                      disabled={logPage === totalLogPages}
+                      onClick={() => setLogPage(p => Math.min(logPages, p + 1))}
+                      disabled={logPage === logPages}
                       className="px-3 py-1 bg-dark-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       下一页
                     </button>
                     <button
-                      onClick={() => setLogPage(totalLogPages)}
-                      disabled={logPage === totalLogPages}
+                      onClick={() => setLogPage(logPages)}
+                      disabled={logPage === logPages}
                       className="px-3 py-1 bg-dark-700 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       末页
