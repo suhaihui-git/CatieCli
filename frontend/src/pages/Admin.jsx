@@ -3,6 +3,8 @@ import {
     ArrowLeft,
     Cat,
     Check,
+    ChevronDown,
+    ChevronUp,
     Download,
     ExternalLink,
     Eye,
