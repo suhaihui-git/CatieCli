@@ -14,8 +14,28 @@ from app.services.credential_pool import CredentialPool
 from app.services.gemini_client import GeminiClient
 from app.services.websocket import notify_log_update, notify_stats_update
 from app.config import settings
+import re
 
 router = APIRouter(tags=["API代理"])
+
+
+def extract_status_code(error_str: str, default: int = 500) -> int:
+    """从错误信息中提取HTTP状态码"""
+    # 匹配 "API Error 403" 或 "code": 403 或 status_code=403 等模式
+    patterns = [
+        r'API Error (\d{3})',
+        r'"code":\s*(\d{3})',
+        r'status_code[=:]\s*(\d{3})',
+        r'HTTP (\d{3})',
+        r'Error (\d{3}):',
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, error_str)
+        if match:
+            code = int(match.group(1))
+            if 400 <= code < 600:
+                return code
+    return default
 
 
 async def get_user_from_api_key(request: Request, db: AsyncSession = Depends(get_db)) -> User:
@@ -431,7 +451,8 @@ async def chat_completions(
                                         continue
                             
                             # 无法重试，输出错误
-                            await log_usage(500, cred=credential, error_msg=error_str)
+                            status_code = extract_status_code(error_str)
+                            await log_usage(status_code, cred=credential, error_msg=error_str)
                             yield f"data: {json.dumps({'error': f'API Error (已重试 {stream_retry + 1} 次): {error_str}'})}\n\n"
                             return
                 
@@ -462,8 +483,9 @@ async def chat_completions(
                 print(f"[Proxy] ⚠️ 请求失败: {error_str}，切换凭证重试 ({retry_attempt + 2}/{max_retries + 1})", flush=True)
                 continue
             
-            await log_usage(500, error_msg=error_str)
-            raise HTTPException(status_code=500, detail=f"API调用失败 (已重试 {retry_attempt + 1} 次): {error_str}")
+            status_code = extract_status_code(error_str)
+            await log_usage(status_code, error_msg=error_str)
+            raise HTTPException(status_code=status_code, detail=f"API调用失败 (已重试 {retry_attempt + 1} 次): {error_str}")
     
     # 所有重试都失败
     raise HTTPException(status_code=503, detail=f"所有凭证都失败了: {last_error}")
@@ -634,9 +656,11 @@ async def gemini_generate_content(
     except HTTPException:
         raise
     except Exception as e:
-        await CredentialPool.handle_credential_failure(db, credential.id, str(e))
-        await log_usage(500, error_msg=str(e))
-        raise HTTPException(status_code=500, detail=str(e))
+        error_str = str(e)
+        await CredentialPool.handle_credential_failure(db, credential.id, error_str)
+        status_code = extract_status_code(error_str)
+        await log_usage(status_code, error_msg=error_str)
+        raise HTTPException(status_code=status_code, detail=error_str)
 
 
 @router.post("/v1beta/models/{model:path}:streamGenerateContent")
@@ -769,9 +793,11 @@ async def gemini_stream_generate_content(
             
             await log_usage()
         except Exception as e:
-            await CredentialPool.handle_credential_failure(db, credential.id, str(e))
-            await log_usage(500, error_msg=str(e))
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            error_str = str(e)
+            await CredentialPool.handle_credential_failure(db, credential.id, error_str)
+            status_code = extract_status_code(error_str)
+            await log_usage(status_code, error_msg=error_str)
+            yield f"data: {json.dumps({'error': error_str})}\n\n"
     
     return StreamingResponse(
         stream_generator(),
@@ -886,8 +912,10 @@ async def openai_proxy(
                     
                     await log_usage()
                 except Exception as e:
-                    await log_usage(500, error_msg=str(e))
-                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                    error_str = str(e)
+                    status_code = extract_status_code(error_str)
+                    await log_usage(status_code, error_msg=error_str)
+                    yield f"data: {json.dumps({'error': error_str})}\n\n"
             
             return StreamingResponse(
                 stream_generator(),
@@ -912,5 +940,7 @@ async def openai_proxy(
                 )
     
     except Exception as e:
-        await log_usage(500, error_msg=str(e))
-        raise HTTPException(status_code=500, detail=f"OpenAI API 请求失败: {str(e)}")
+        error_str = str(e)
+        status_code = extract_status_code(error_str)
+        await log_usage(status_code, error_msg=error_str)
+        raise HTTPException(status_code=status_code, detail=f"OpenAI API 请求失败: {error_str}")
