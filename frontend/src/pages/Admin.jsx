@@ -86,7 +86,7 @@ export default function Admin() {
         const res = await api.get('/api/admin/logs?limit=100')
         setLogs(res.data.logs)
       } else if (tab === 'errors') {
-        const res = await api.get('/api/manage/stats')
+        const res = await api.get('/api/manage/stats/global')
         setErrorStats(res.data.errors || { by_code: {}, recent: [] })
       }
     } catch (err) {
